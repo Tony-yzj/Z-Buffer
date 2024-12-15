@@ -18,7 +18,7 @@ struct Polygon
 	// calculate the parameters of the plane equation
 	void calculate_params(objl::Vector3 p, objl::Vector3 normal)
 	{
-		// a = nx, b = ny, c = nz, d = -n¡¤p1
+		// a = nx, b = ny, c = nz, d = -nï¿½ï¿½p1
 		this->a = normal.X;
         this->b = normal.Y;
         this->c = normal.Z;
@@ -30,7 +30,7 @@ struct Edge
 {
 	float x;
 	float dx;
-	float dy;
+	int dy;
     Polygon* id;
 };
 

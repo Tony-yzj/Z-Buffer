@@ -10,8 +10,8 @@ using namespace cv;
 using namespace objl;
 
 #define SCALE 0.75
-#define IMG_WIDTH 600
-#define IMG_HEIGHT 400
+#define IMG_WIDTH 800
+#define IMG_HEIGHT 600
 
 std::vector<std::vector<Polygon*>> PT;
 std::vector<std::vector<Edge>> ET;
@@ -32,7 +32,7 @@ void EdgeListContruct(Vector3 p1, Vector3 p2, float ymin, float ymax, Polygon* i
     float min_y = min(p1.Y, p2.Y);
     float max_y = max(p1.Y, p2.Y);
 
-    edge.dy = max_y - min_y;
+    edge.dy = (int)floor(max_y - min_y);
     edge.id = id;
 
     // note: horizontal edges need to be considered separately
@@ -55,9 +55,6 @@ void ListContruct(Loader &loader)
     {
         Polygon* polygon = new Polygon();
         Triangle triangle = loader.LoadedTriangles[i];
-
-        if(i == 4883)
-            cout << "error" << endl;
         
         // calculate params
         Vector3 p = triangle.vertices[0].Position;
@@ -83,7 +80,7 @@ void ListContruct(Loader &loader)
             EdgeListContruct(p1.Position, p2.Position, min_y, max_y, polygon);
         }
 
-        polygon->dy = (int)floor(max_y) - (int)floor(min_y);
+        polygon->dy = (int)floor(max_y - min_y);
         polygon->color = Vec3b(rand() % 256, rand() % 256, rand() % 256);
 
         PT[(int)floor(max_y)].push_back(polygon);
@@ -94,12 +91,20 @@ void scaleObj(Loader& loader)
 {
     float max_x = -FLT_MAX, max_y = -FLT_MAX;
     float min_x = FLT_MAX, min_y = FLT_MAX;
+    for (int i = 0; i < loader.LoadedTriangles.size(); i++)
+    {
+        Triangle triangle = loader.LoadedTriangles[i];
+        for (int j = 0; j < triangle.vertices.size(); j++)
+        {
+            loader.LoadedTriangles[i].vertices[j].Position.Y = -loader.LoadedTriangles[i].vertices[j].Position.Y;
+        }
+    }
     for (int i = 0; i < loader.LoadedVertices.size(); i++)
     {
         max_x = max(max_x, loader.LoadedVertices[i].Position.X);
-        max_y = max(max_y, loader.LoadedVertices[i].Position.Y);
+        max_y = max(max_y, -loader.LoadedVertices[i].Position.Y);
         min_x = min(min_x, loader.LoadedVertices[i].Position.X);
-        min_y = min(min_y, loader.LoadedVertices[i].Position.Y);
+        min_y = min(min_y, -loader.LoadedVertices[i].Position.Y);
     }
     float scale = min(IMG_HEIGHT, IMG_WIDTH) / max(max_x - min_x, max_y - min_y);
     scale *= SCALE;
@@ -128,8 +133,6 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
         for (int i = 0; i < PT[y].size(); i++)
         {
             Polygon *polygon = PT[y][i];
-            if(polygon->id == 4883)
-                cout << "error" << endl;
             // add edges intersected with the scan line into active edge list(AET)
             ActiveEdge ae;
             Edge edge1, edge2;
@@ -175,8 +178,6 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
         {
             ActiveEdge& ae = AET[i];
             float x = ae.xl, zx = ae.zl;
-            if(ae.xr - x > 50)
-                cout << "error" << endl;
             for(int j = (int)round(x); j <= (int)round(ae.xr); j++)
             {
                 if (zx > z_buffer[j])
@@ -229,7 +230,6 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
                         break;
                     }
                 }
-                assert(AET[i].dyr >= 0);
             }
 
         }
@@ -249,7 +249,7 @@ int main()
 
     Loader loader;
     // load mesh
-    loader.LoadFile("D:/CS/2024_fall_winter/CG/CG_project1/CG_project1/models/bunny/bunny.obj");
+    loader.LoadFile("/Users/jun/CS/2024 fall/CG/project1/models/bunny/bunny.obj");
     // scale to fit in image
     scaleObj(loader);
 
