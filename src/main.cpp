@@ -17,22 +17,28 @@ std::vector<std::vector<Polygon*>> PT;
 std::vector<std::vector<Edge>> ET;
 // initial image
 Mat image(IMG_HEIGHT, IMG_WIDTH, CV_8UC3, Vec3b(0, 0, 0));
-float min_z = FLT_MAX;
+float min_z = FLT_MAX, max_z = -FLT_MAX;
 
-void EdgeListContruct(Vector3 p1, Vector3 p2, float ymin, float ymax, Polygon* id)
+void EdgeListContruct(Vector3 p1, Vector3 p2, int ymax, Polygon* id)
 {
     Edge edge;
 
+    // let p1 always be the top point
     if(p1.Y <= p2.Y)
         swap(p1, p2);
     edge.x = p1.X;
+
+    // neglect parallel-to-x-axis edges
+    if(p1.Y == p2.Y)
+        return;
+    
     edge.dx = -(p1.X - p2.X)/(p1.Y - p2.Y);
 
-    // find max and min y with rounding
-    float min_y = min(p1.Y, p2.Y);
-    float max_y = max(p1.Y, p2.Y);
+    // assign max and min y
+    int min_y = p2.Y;
+    int max_y = p1.Y;
 
-    edge.dy = (int)floor(max_y - min_y);
+    edge.dy = max_y - min_y;
     edge.id = id;
 
     // note: horizontal edges need to be considered separately
@@ -45,9 +51,13 @@ void EdgeListContruct(Vector3 p1, Vector3 p2, float ymin, float ymax, Polygon* i
         max_y -= 1;
     }
 
-    ET[(int)floor(max_y)].push_back(edge);
+    ET[max_y].push_back(edge);
 }
 
+Vector3 RoundVertex(Vector3 v)
+{
+    return Vector3(round(v.X), round(v.Y), v.Z);
+}
 void ListContruct(Loader &loader)
 {
     srand(13);
@@ -60,30 +70,41 @@ void ListContruct(Loader &loader)
         Vector3 p = triangle.vertices[0].Position;
         Vector3 normal = triangle.vertices[0].Normal;
 
-        polygon->calculate_params(p, normal);
+        if(normal.dot(Vector3(0, 0, -1)) < 0)
+            continue;
+        polygon->calculate_params(RoundVertex(triangle.vertices[0].Position), RoundVertex(triangle.vertices[1].Position), RoundVertex(triangle.vertices[2].Position), normal);
 
+        // polygon->calculate_params(p, normal);
         polygon->id = i;
 
         // edge list construction
-        float min_y = FLT_MAX, max_y = -FLT_MAX;
+        int min_y = INT_MAX, max_y = INT_MIN;
+        float color_z = 0;
         for (int j = 0; j < triangle.vertices.size(); j++)
         {
-            min_y = min(min_y, triangle.vertices[j].Position.Y);
-            max_y = max(max_y, triangle.vertices[j].Position.Y);
+            min_y = min(min_y, (int)round(triangle.vertices[j].Position.Y));
+            max_y = max(max_y, (int)round(triangle.vertices[j].Position.Y));
+            color_z += triangle.vertices[j].Position.Z;
         }
 
         for (int j = 0; j < triangle.vertices.size(); j++)
         {
-            Vertex p1 = triangle.vertices[j];
-            Vertex p2 = (j == (int)triangle.vertices.size() - 1) ? triangle.vertices[0] : triangle.vertices[j + 1];
+            Vector3 p1 = RoundVertex(triangle.vertices[j].Position);
+            Vector3 p2 = RoundVertex((j == (int)triangle.vertices.size() - 1) ? triangle.vertices[0].Position : triangle.vertices[j + 1].Position);
 
-            EdgeListContruct(p1.Position, p2.Position, min_y, max_y, polygon);
+            EdgeListContruct(p1, p2, max_y, polygon);
         }
 
-        polygon->dy = (int)floor(max_y - min_y);
-        polygon->color = Vec3b(rand() % 256, rand() % 256, rand() % 256);
+        polygon->dy = max_y - min_y;
 
-        PT[(int)floor(max_y)].push_back(polygon);
+        color_z /= triangle.vertices.size();
+        color_z = (color_z - min_z*2)/(max_z*2 - min_z*2);
+        polygon->color = Vec3b(255 * color_z, 255 * color_z, 255 * color_z);
+
+        if(polygon->dy > 0)
+            PT[max_y].push_back(polygon);
+        else
+            delete polygon;
     }
 }
 
@@ -121,8 +142,34 @@ void scaleObj(Loader& loader)
             loader.LoadedTriangles[i].vertices[j].Position.Y = (vertex.Position.Y - center_y) * scale + IMG_HEIGHT / 2;
             loader.LoadedTriangles[i].vertices[j].Position.Z *= scale;
             min_z = min(min_z, loader.LoadedTriangles[i].vertices[j].Position.Z);
+            max_z = max(max_z, loader.LoadedTriangles[i].vertices[j].Position.Z);
         }
     }
+}
+
+void addActiveEdge(vector<ActiveEdge>& AET, Edge edge1, Edge edge2, Polygon* polygon, int y)
+{
+    ActiveEdge ae;
+    assert(edge1.id == edge2.id);
+
+    ae.id = edge1.id;
+
+    // make sure edge1 is always the left edge
+    if (edge1.x > edge2.x || (edge1.dx > edge2.dx && edge1.x == edge2.x))
+        swap(edge1, edge2);
+
+    ae.xl = edge1.x;
+    ae.dxl = edge1.dx;
+    ae.dyl = edge1.dy;
+    ae.xr = edge2.x;
+    ae.dxr = edge2.dx;
+    ae.dyr = edge2.dy;
+
+    ae.zl = -(polygon->a * ae.xl + polygon->b * y + polygon->d)/polygon->c;
+    ae.dzx = polygon->c != 0 ?-polygon->a / polygon->c : 0;
+    ae.dzy = polygon->c != 0 ? polygon->b / polygon->c : 0;
+
+    AET.push_back(ae);
 }
 
 void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
@@ -138,6 +185,7 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
             Edge edge1, edge2;
             ae.id = PT[y][i];
 
+            // find edge in current polygon with max y
             for (int j = 0; j < ET[y].size(); j++)
             {
                 if (ET[y][j].id == PT[y][i])
@@ -148,30 +196,17 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
                 }
             }
 
-            assert(edge1.id == edge2.id);
-
-            ae.id = edge1.id;
-            if (edge1.dx > edge2.dx)
-                swap(edge1, edge2);
-
-            ae.xl = edge1.x;
-            ae.dxl = edge1.dx;
-            ae.dyl = edge1.dy;
-            ae.xr = edge2.x;
-            ae.dxr = edge2.dx;
-            ae.dyr = edge2.dy;
-
-            ae.zl = -(polygon->a * ae.xl + polygon->b * y + polygon->d)/polygon->c;
-            ae.dzx = polygon->c != 0 ?-polygon->a / polygon->c : 0;
-            ae.dzy = polygon->c != 0 ? polygon->b / polygon->c : 0;
-
-            AET.push_back(ae);
+            addActiveEdge(AET, edge1, edge2, polygon, y);
             APT.push_back(polygon);
         }
 
-        // initialize z buffer as min_z
-        for (int j = 0; j < image.cols; j++)
-            z_buffer[j] = min_z;
+        // initialize z buffer as min_z if there are active edges
+        if(AET.size() > 0)
+        {
+            for (int j = 0; j < image.cols; j++)
+                z_buffer[j] = min_z;
+        }
+        
 
         // update z buffer and color of pixels in the scan line
         for (int i = 0; i < AET.size(); i++)
@@ -189,16 +224,35 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
             }
 
             // update AET
-            AET[i].xl += ae.dxl * (AET[i].dyl < 1 ? AET[i].dyl : 1);
-            AET[i].xr += ae.dxr * (AET[i].dyr < 1 ? AET[i].dyr : 1);
+            AET[i].xl += ae.dxl;
+            AET[i].xr += ae.dxr;
             AET[i].zl += ae.dzx * ae.dxl + ae.dzy;
             AET[i].dyl -= 1;
             AET[i].dyr -= 1;
 
             if (AET[i].dyl < 0 && AET[i].dyr < 0)
             {
-                AET.erase(AET.begin() + i);
-                i--;
+                if(y == 0)
+                    break;
+                
+                Edge edge1, edge2;
+                int j = 0;
+                for(j = 0; j < ET[y-1].size(); j++)
+                {
+                    if(AET[i].id == ET[y-1][j].id)
+                    {
+                        edge1 = ET[y-1][j];
+                        edge2 = ET[y-1][j+1];
+                        break;
+                    }
+                }
+                if(j == ET[y-1].size())
+                {
+                    AET.erase(AET.begin() + i);
+                    i--;
+                }
+                else
+                    addActiveEdge(AET, edge1, edge2, AET[i].id, y);
             }
             else if (AET[i].dyl < 0)
             {

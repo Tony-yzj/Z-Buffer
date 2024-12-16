@@ -16,9 +16,20 @@ struct Polygon
 	cv::Vec3b color;
 
 	// calculate the parameters of the plane equation
+	void calculate_params(objl::Vector3 p1, objl::Vector3 p2, objl::Vector3 p3, objl::Vector3 n)
+	{
+		// a = nx, b = ny, c = nz, d = -n x p1
+		objl::Vector3 normal = (p2-p1).cross(p3-p1).normalize();
+		if(n.dot(normal) < 0)
+			normal = normal * (-1);
+		this->a = normal.X;
+        this->b = normal.Y;
+        this->c = normal.Z;
+        this->d	= -1 * (normal.dot(p1));
+	}
 	void calculate_params(objl::Vector3 p, objl::Vector3 normal)
 	{
-		// a = nx, b = ny, c = nz, d = -n��p1
+		// a = nx, b = ny, c = nz, d = -n x p1
 		this->a = normal.X;
         this->b = normal.Y;
         this->c = normal.Z;
