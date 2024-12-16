@@ -1,6 +1,7 @@
 ﻿#include <iostream>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/utils/logger.hpp>
+#include <time.h>
 
 #include "readObj.h"
 #include "List.h"
@@ -313,6 +314,9 @@ int main()
     // contruct polygon and edge list
     PT.resize(image.rows);
     ET.resize(image.rows);
+
+    // time record
+    clock_t start = clock();
     ListContruct(loader);
 
     // scan line z buffer algorithm
@@ -320,6 +324,8 @@ int main()
     vector<ActiveEdge> AET;
 
     scanLine(z_buffer, APT, AET);
+    clock_t end = clock();
+    cout << "Time: " << (double)(end - start) / CLOCKS_PER_SEC << "s" << endl;
 
     // show image
     imshow("image", image);
