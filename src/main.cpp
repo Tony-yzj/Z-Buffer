@@ -1,6 +1,9 @@
-﻿#include <cassert>
+﻿#include <algorithm>
+#include <cassert>
 #include <cfloat>
 #include <iostream>
+#include <opencv2/core/cvdef.h>
+#include <opencv2/core/matx.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/utils/logger.hpp>
 #include <time.h>
@@ -13,15 +16,30 @@ using namespace std;
 using namespace cv;
 using namespace objl;
 
-#define SCALE 0.75
+#define SCALE 0.5
 #define IMG_WIDTH 800
 #define IMG_HEIGHT 600
+#define CULL_ENBALE
+
+struct MouseParams {
+    Loader* loader;
+    float* zbuffer;
+    vector<Polygon*> *APT;
+    vector<ActiveEdge> * AET;
+};
 
 std::vector<std::vector<Polygon*>> PT;
 std::vector<std::vector<Edge>> ET;
 // initial image
 Mat image(IMG_HEIGHT, IMG_WIDTH, CV_8UC3, Vec3b(0, 0, 0));
 float min_z = FLT_MAX, max_z = -FLT_MAX;
+Point prevMousePos;     // Previous mouse position
+bool isDragging = false;    // Flag to check if dragging
+
+float rotationX = 0.0f;     // Rotation angle around X-axis
+float rotationY = 0.0f;     // Rotation angle around Y-axis
+Vector3 cameraDirect(0, 0, -1);
+
 void EdgeListContruct(Vector3 p1, Vector3 p2, int ymax, Polygon* id)
 {
     Edge edge;
@@ -29,21 +47,23 @@ void EdgeListContruct(Vector3 p1, Vector3 p2, int ymax, Polygon* id)
     // let p1 always be the top point
     if(p1.Y <= p2.Y)
         swap(p1, p2);
-    edge.x = p1.X;
 
+    edge.dx = -(p1.X - p2.X)/(p1.Y - p2.Y);
 
-    if(p1.Y >= IMG_HEIGHT)
+    if(p2.Y > IMG_HEIGHT - 1)
+        return;
+
+    if(p1.Y > IMG_HEIGHT - 1)
     {
-        edge.x += edge.dx * (p1.Y - IMG_HEIGHT + 1);
+        p1.X += edge.dx * (p1.Y - IMG_HEIGHT + 1);
         p1.Y = IMG_HEIGHT - 1;
     }
 
     // neglect parallel-to-x-axis edges
     if(p1.Y == p2.Y)
         return;
-    
-    edge.dx = -(p1.X - p2.X)/(p1.Y - p2.Y);
 
+    edge.x = p1.X;
     // assign max and min y
     int min_y = p2.Y;
     int max_y = p1.Y;
@@ -51,10 +71,12 @@ void EdgeListContruct(Vector3 p1, Vector3 p2, int ymax, Polygon* id)
     edge.dy = max_y - min_y;
     edge.id = id;
 
+    assert(edge.dy >= 1);
+
     // note: horizontal edges need to be considered separately
     // 
     // truncation edges
-    if (p1.Y != ymax && ymax < IMG_HEIGHT)
+    if (p1.Y < ymax && ymax < IMG_HEIGHT)
     {
         edge.x = p1.X + edge.dx;
         edge.dy -= 1;
@@ -67,15 +89,27 @@ void EdgeListContruct(Vector3 p1, Vector3 p2, int ymax, Polygon* id)
 
 Vector3 RoundVertex(Vector3 v)
 {
-    return Vector3(round(v.X), round(v.Y), v.Z);
+    return Vector3((int)round(v.X), (int)round(v.Y), v.Z);
+}
+
+void ClearTable()
+{
+    for(int i = 0; i < PT.size(); i++)
+    {
+        for(int j = 0; j < PT[i].size(); j++)
+        {
+            delete PT[i][j];
+        }
+    }
+    PT.clear();
+    ET.clear();
+    PT.resize(IMG_HEIGHT);
+    ET.resize(IMG_HEIGHT);  
 }
 void ListContruct(Loader* loader)
 {
     // Clear PT & ET
-    PT.clear();
-    ET.clear();
-    PT.resize(IMG_HEIGHT);
-    ET.resize(IMG_HEIGHT);
+    ClearTable();
 
     for (int i = 0; i < loader->LoadedTriangles.size(); i++)
     {
@@ -86,22 +120,24 @@ void ListContruct(Loader* loader)
         Vector3 p = triangle.vertices[0].Position;
         Vector3 normal = triangle.vertices[0].Normal;
 
-        // Cull
-        // if(normal.dot(Vector3(0, 0, -1)) < 0)
-        //     continue;
         polygon->calculate_params(RoundVertex(triangle.vertices[0].Position), RoundVertex(triangle.vertices[1].Position), RoundVertex(triangle.vertices[2].Position), normal);
 
-        // polygon->calculate_params(p, normal);
+        #ifdef CULL_ENBALE
+        // Cull
+        if(normal.dot(cameraDirect) < 0)
+            continue;
+        #endif
+        
         polygon->id = i;
 
         // edge list construction
         int min_y = INT_MAX, max_y = INT_MIN;
-        float dAverage = 0;
+        polygon->depth = 0;
         for (int j = 0; j < triangle.vertices.size(); j++)
         {
             min_y = min(min_y, (int)round(triangle.vertices[j].Position.Y));
             max_y = max(max_y, (int)round(triangle.vertices[j].Position.Y));
-            dAverage += triangle.vertices[j].Position.Z;
+            polygon->depth += triangle.vertices[j].Position.Z;
         }
 
         for (int j = 0; j < triangle.vertices.size(); j++)
@@ -114,14 +150,15 @@ void ListContruct(Loader* loader)
 
         polygon->dy = max_y - min_y;
 
-        dAverage /= triangle.vertices.size();
-        float scale = (dAverage - min_z - 10)/(max_z - min_z - 10);
+        polygon->depth /= triangle.vertices.size();
+        float scale = (polygon->depth - min_z)/(max_z - min_z);
         assert(scale <= 1);
         polygon->color = Vec3b(255 * scale, 255 * scale, 255 * scale);
 
         if(max_y >= IMG_HEIGHT)
             max_y = IMG_HEIGHT - 1;
-        if(polygon->dy > 0 && max_y >= 0 && max_y < IMG_HEIGHT)
+
+        if(polygon->dy > 0 && max_y > 0 && min_y < IMG_HEIGHT - 1)
             PT[max_y].push_back(polygon);
         else
             delete polygon;
@@ -132,20 +169,20 @@ void scaleObj(Loader* loader)
 {
     float max_x = -FLT_MAX, max_y = -FLT_MAX;
     float min_x = FLT_MAX, min_y = FLT_MAX;
-    for (int i = 0; i < loader->LoadedTriangles.size(); i++)
-    {
-        Triangle triangle = loader->LoadedTriangles[i];
-        for (int j = 0; j < triangle.vertices.size(); j++)
-        {
-            loader->LoadedTriangles[i].vertices[j].Position.Y = -loader->LoadedTriangles[i].vertices[j].Position.Y;
-        }
-    }
+    // for (int i = 0; i < loader->LoadedTriangles.size(); i++)
+    // {
+    //     Triangle triangle = loader->LoadedTriangles[i];
+    //     for (int j = 0; j < triangle.vertices.size(); j++)
+    //     {
+    //         loader->LoadedTriangles[i].vertices[j].Position.Y = -loader->LoadedTriangles[i].vertices[j].Position.Y;
+    //     }
+    // }
     for (int i = 0; i < loader->LoadedVertices.size(); i++)
     {
         max_x = max(max_x, loader->LoadedVertices[i].Position.X);
-        max_y = max(max_y, -loader->LoadedVertices[i].Position.Y);
+        max_y = max(max_y, loader->LoadedVertices[i].Position.Y);
         min_x = min(min_x, loader->LoadedVertices[i].Position.X);
-        min_y = min(min_y, -loader->LoadedVertices[i].Position.Y);
+        min_y = min(min_y, loader->LoadedVertices[i].Position.Y);
         min_z = min(min_z, loader->LoadedVertices[i].Position.Z);
         max_z = max(max_z, loader->LoadedVertices[i].Position.Z);
     }
@@ -172,6 +209,39 @@ void scaleObj(Loader* loader)
     }
 }
 
+void rotateObj(Loader* loader, cv::Mat rot)
+{
+    min_z = FLT_MAX;
+    max_z = -FLT_MAX;
+
+    for (int i = 0; i < loader->LoadedTriangles.size(); i++)
+    {
+        Triangle triangle = loader->LoadedTriangles[i];
+        for (int j = 0; j < triangle.vertices.size(); j++)
+        {
+
+            Vertex &vertex = triangle.vertices[j];
+            cv::Mat p = (cv::Mat_<float>(3, 1) << vertex.Position.X - IMG_WIDTH/2, vertex.Position.Y - IMG_HEIGHT/2, vertex.Position.Z);
+            p =  rot * p;
+
+            loader->LoadedTriangles[i].vertices[j].Position.X = p.at<float>(0) + IMG_WIDTH/2;
+            loader->LoadedTriangles[i].vertices[j].Position.Y = p.at<float>(1) + IMG_HEIGHT/2;
+            loader->LoadedTriangles[i].vertices[j].Position.Z = p.at<float>(2);
+            
+            #ifdef CULL_ENBALE
+            cv::Mat n = (cv::Mat_<float>(3, 1) << vertex.Normal.X, vertex.Normal.Y, vertex.Normal.Z);
+            n = rot * n;
+            loader->LoadedTriangles[i].vertices[j].Normal.X = n.at<float>(0);
+            loader->LoadedTriangles[i].vertices[j].Normal.Y = n.at<float>(1);
+            loader->LoadedTriangles[i].vertices[j].Normal.Z = n.at<float>(2);
+            #endif
+
+            min_z = min(min_z, loader->LoadedTriangles[i].vertices[j].Position.Z);
+            max_z = max(max_z, loader->LoadedTriangles[i].vertices[j].Position.Z);
+        }
+    }
+}
+
 void addActiveEdge(vector<ActiveEdge>& AET, Edge edge1, Edge edge2, Polygon* polygon, int y)
 {
     ActiveEdge ae;
@@ -190,7 +260,7 @@ void addActiveEdge(vector<ActiveEdge>& AET, Edge edge1, Edge edge2, Polygon* pol
     ae.dxr = edge2.dx;
     ae.dyr = edge2.dy;
 
-    ae.zl = -(polygon->a * ae.xl + polygon->b * y + polygon->d)/polygon->c;
+    ae.zl = polygon->c != 0 ?-(polygon->a * ae.xl + polygon->b * y + polygon->d)/polygon->c : polygon->depth;
     ae.dzx = polygon->c != 0 ?-polygon->a / polygon->c : 0;
     ae.dzy = polygon->c != 0 ? polygon->b / polygon->c : 0;
 
@@ -204,8 +274,9 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
     for (int y = IMG_HEIGHT - 1; y >= 0; y--)
     {
         // if new polygon is in the scan line, add it to active polygon list(APT)
-        for (int i = 0; i < PT[y].size(); i++)
+        for (int i = 0; i < (int)PT[y].size(); i++)
         {
+            assert(i >= 0);
             Polygon *polygon = PT[y][i];
             // add edges intersected with the scan line into active edge list(AET)
             ActiveEdge ae;
@@ -231,7 +302,7 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
         for (int j = 0; j < image.cols; j++)
         {
             z_buffer[j] = -FLT_MAX;
-            image.at<Vec3b>(y, j) = Vec3b(0, 0, 0);
+            image.at<Vec3b>(IMG_HEIGHT - 1 - y, j) = Vec3b(244, 234, 226);
         }
         
 
@@ -239,17 +310,27 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
         for (int i = 0; i < AET.size(); i++)
         {
             ActiveEdge& ae = AET[i];
-            float x = ae.xl, zx = ae.zl;
-            if(x < 0)
-                x = 0;
-            else if(x > IMG_WIDTH - 1)
-                x = IMG_WIDTH - 1;
+            float zx = ae.zl;
+            int left = (int)round(ae.xl), right = (int)round(ae.xr);
 
-            for(int j = (int)round(x); j <= (int)round(ae.xr); j++)
+            if(left < 0)
+            {
+                left = 0;
+                zx += ae.dzx * (0 - ae.xl);
+            }    
+            else if(left > IMG_WIDTH - 1)
+                left = IMG_WIDTH - 1;
+
+            if(right < 0)
+                right = 0;
+            else if(right > IMG_WIDTH - 1)
+                right = IMG_WIDTH - 1;
+
+            for(int j = left; j <= right; j++)
             {
                 if (zx > z_buffer[j])
                 {
-                    image.at<Vec3b>(y, j) = ae.id->color;
+                    image.at<Vec3b>((IMG_HEIGHT - 1 - y), j) = ae.id->color;
                     z_buffer[j] = zx;
                 }
                 zx += ae.dzx;
@@ -298,6 +379,7 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
                         AET[i].xl = edge.x;
                         AET[i].dxl = edge.dx;
                         AET[i].dyl = edge.dy;
+                        break;
                     }
                 }
             }
@@ -355,6 +437,7 @@ void mouseCallback(int event, int x, int y, int flags, void* userdata) {
         float angleRadiansX = rotationX * CV_PI / 180.0f; // Convert degrees to radians
         float angleRadiansY = rotationY * CV_PI / 180.0f;
 
+        clock_t start = clock();    
         cv::Mat R = getRotationMatrix(angleRadiansX, angleRadiansY);
         rotateObj(params->loader, R); // Rotate the object
 
@@ -363,6 +446,10 @@ void mouseCallback(int event, int x, int y, int flags, void* userdata) {
         scanLine(params->zbuffer, *(params->APT), *(params->AET));
 
         cout << "Mouse moved to (" << x << ", " << y << ")" << endl;
+        clock_t end = clock();
+        cout << "Time: " << (double)(end - start) / CLOCKS_PER_SEC << " seconds" << endl;
+        // put text on image
+        cv::putText(image, "Time: " + std::to_string((double)(end - start) / CLOCKS_PER_SEC) + " seconds", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 1);
 
         cv::imshow("Zbuffer", image);
     } 
@@ -373,15 +460,20 @@ void mouseCallback(int event, int x, int y, int flags, void* userdata) {
     }
 }
 
-int main()
+int main(int argc, char** argv)
 {
     utils::logging::setLogLevel(utils::logging::LOG_LEVEL_SILENT);
 
     Loader* loader = new Loader();
+    string path = "../models/";
     // load mesh
-    loader->LoadFile("/Users/jun/CS/2024 fall/CG/project1/models/bunny/bunny.obj");
+    if(argc == 1)
+        loader->LoadFile("../models/Crate/Crate1.obj");
+    else if(argc == 2)
+        loader->LoadFile(argv[1]);
     // scale to fit in image
     scaleObj(loader);
+    rotateObj(loader, getRotationMatrix(36*CV_PI/180.0, 25 * CV_PI / 180.0));
 
     // initialize z-buffer for one scan line
     float* z_buffer = new float[image.cols];
@@ -410,6 +502,8 @@ int main()
     
     clock_t end = clock();
     cout << "Time: " << (double)(end - start) / CLOCKS_PER_SEC << "s" << endl;
+    // put text on image
+    cv::putText(image, "Time: " + std::to_string((double)(end - start) / CLOCKS_PER_SEC) + " seconds", cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 1);
 
     imshow("Zbuffer", image);
 
