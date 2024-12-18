@@ -1,6 +1,7 @@
 # 设置 CMake 最低版本和项目名称
 cmake_minimum_required(VERSION 3.10)
 project(zbuffer)
+project(hierachyZbuffer)
 
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 17)
@@ -22,10 +23,14 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 # 查找 src 文件夹下的所有 .cpp 文件
-file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/src/*.h)
+file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/scanline.cpp ${PROJECT_SOURCE_DIR}/src/*.h)
+file(GLOB H_FILES ${PROJECT_SOURCE_DIR}/src/hierachy.cpp ${PROJECT_SOURCE_DIR}/src/*.h)
+
 
 # 定义可执行文件
 add_executable(zbuffer ${SRC_FILES})
+add_executable(hierachyZbuffer ${H_FILES})
 
 # 链接 OpenCV 库
 target_link_libraries(zbuffer ${OpenCV_LIBS})
+target_link_libraries(hierachyZbuffer ${OpenCV_LIBS})
