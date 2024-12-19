@@ -12,13 +12,13 @@
 #define RASTERIZER_OBJ_LOADER_H
 
 #pragma once
-typedef std::pair<double, double> pdd2;
 
 #include <iostream>
 #include <vector>
 #include <string>
 #include <fstream>
 #include <math.h>
+typedef std::pair<double, double> pdd2;
 
 // Print progress to console while loading (large models)
 #define OBJL_CONSOLE_OUTPUT
@@ -156,8 +156,8 @@ namespace objl
 		float Z;
 	};
 
-	// 计算从一点到平面的投影
-	Vector3 ProjectToPlane(const Vector3& point, const Vector3& planePoint, const Vector3& planeNormal) {
+	// 锟斤拷锟斤拷锟揭伙拷愕狡斤拷锟斤拷投影
+	inline Vector3 ProjectToPlane(const Vector3& point, const Vector3& planePoint, const Vector3& planeNormal) {
 		Vector3 v = point - planePoint;
 		float len = v.dot(planeNormal);
 		return point - planeNormal * len;
@@ -263,7 +263,7 @@ namespace objl
 	namespace math
 	{
 		// Vector3 Cross Product
-		Vector3 CrossV3(const Vector3 a, const Vector3 b)
+		inline Vector3 CrossV3(const Vector3 a, const Vector3 b)
 		{
 			return Vector3(a.Y * b.Z - a.Z * b.Y,
 				a.Z * b.X - a.X * b.Z,
@@ -271,19 +271,19 @@ namespace objl
 		}
 
 		// Vector3 Magnitude Calculation
-		float MagnitudeV3(const Vector3 in)
+		inline float MagnitudeV3(const Vector3 in)
 		{
 			return (sqrtf(powf(in.X, 2) + powf(in.Y, 2) + powf(in.Z, 2)));
 		}
 
 		// Vector3 DotProduct
-		float DotV3(const Vector3 a, const Vector3 b)
+		inline float DotV3(const Vector3 a, const Vector3 b)
 		{
 			return (a.X * b.X) + (a.Y * b.Y) + (a.Z * b.Z);
 		}
 
 		// Angle between 2 Vector3 Objects
-		float AngleBetweenV3(const Vector3 a, const Vector3 b)
+		inline float AngleBetweenV3(const Vector3 a, const Vector3 b)
 		{
 			float angle = DotV3(a, b);
 			angle /= (MagnitudeV3(a) * MagnitudeV3(b));
@@ -291,7 +291,7 @@ namespace objl
 		}
 
 		// Projection Calculation of a onto b
-		Vector3 ProjV3(const Vector3 a, const Vector3 b)
+		inline Vector3 ProjV3(const Vector3 a, const Vector3 b)
 		{
 			Vector3 bn = b / MagnitudeV3(b);
 			return bn * DotV3(a, bn);
@@ -305,13 +305,13 @@ namespace objl
 	namespace algorithm
 	{
 		// Vector3 Multiplication Opertor Overload
-		Vector3 operator*(const float& left, const Vector3& right)
+		inline Vector3 operator*(const float& left, const Vector3& right)
 		{
 			return Vector3(right.X * left, right.Y * left, right.Z * left);
 		}
 
 		// A test to see if P1 is on the same side as P2 of a line segment ab
-		bool SameSide(Vector3 p1, Vector3 p2, Vector3 a, Vector3 b)
+		inline bool SameSide(Vector3 p1, Vector3 p2, Vector3 a, Vector3 b)
 		{
 			Vector3 cp1 = math::CrossV3(b - a, p1 - a);
 			Vector3 cp2 = math::CrossV3(b - a, p2 - a);
@@ -323,7 +323,7 @@ namespace objl
 		}
 
 		// Generate a cross produect normal for a triangle
-		Vector3 GenTriNormal(Vector3 t1, Vector3 t2, Vector3 t3)
+		inline Vector3 GenTriNormal(Vector3 t1, Vector3 t2, Vector3 t3)
 		{
 			Vector3 u = t2 - t1;
 			Vector3 v = t3 - t1;
@@ -334,7 +334,7 @@ namespace objl
 		}
 
 		// Check to see if a Vector3 Point is within a 3 Vector3 Triangle
-		bool inTriangle(Vector3 point, Vector3 tri1, Vector3 tri2, Vector3 tri3)
+		inline bool inTriangle(Vector3 point, Vector3 tri1, Vector3 tri2, Vector3 tri3)
 		{
 			// Test to see if it is within an infinite prism that the triangle outlines.
 			bool within_tri_prisim = SameSide(point, tri1, tri2, tri3) && SameSide(point, tri2, tri1, tri3)

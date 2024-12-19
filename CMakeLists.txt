@@ -23,8 +23,8 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 # 查找 src 文件夹下的所有 .cpp 文件
-file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/scanline.cpp ${PROJECT_SOURCE_DIR}/src/*.h)
-file(GLOB H_FILES ${PROJECT_SOURCE_DIR}/src/hierachy.cpp ${PROJECT_SOURCE_DIR}/src/*.h)
+file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/scanlineZbuffer.cpp ${PROJECT_SOURCE_DIR}/src/model.cpp ${PROJECT_SOURCE_DIR}/src/scanline.cpp  ${PROJECT_SOURCE_DIR}/src/*.h)
+file(GLOB H_FILES ${PROJECT_SOURCE_DIR}/src/hierachyZbuffer.cpp  ${PROJECT_SOURCE_DIR}/src/model.cpp ${PROJECT_SOURCE_DIR}/src/scanline.cpp ${PROJECT_SOURCE_DIR}/src/*.h)
 
 
 # 定义可执行文件
