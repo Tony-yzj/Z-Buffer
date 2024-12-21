@@ -8,8 +8,10 @@
 #include <opencv2/core/utils/logger.hpp>
 #include <time.h>
 
-#include "readObj.h"
+#include "Features.h"
+#include "hierachy.h"
 #include "scanline.h"
+#define HIERACHY 1
 
 using namespace std;
 using namespace cv;
@@ -17,7 +19,7 @@ using namespace objl;
 
 struct MouseParams {
     Loader* loader;
-    float* zbuffer;
+    HierarchicalZBuffer* hvb;
     vector<Polygon*> *APT;
     vector<ActiveEdge> * AET;
 };
@@ -25,7 +27,7 @@ struct MouseParams {
 std::vector<std::vector<Polygon*>> PT;
 std::vector<std::vector<Edge>> ET;
 // initial image
-Mat image(IMG_HEIGHT, IMG_WIDTH, CV_8UC3, Vec3b(0, 0, 0));
+Mat image(IMG_HEIGHT, IMG_WIDTH, CV_8UC3, Vec3b(244, 234, 226));
 float min_z = FLT_MAX, max_z = -FLT_MAX;
 Point prevMousePos;     // Previous mouse position
 bool isDragging = false;    // Flag to check if dragging
@@ -59,13 +61,16 @@ void mouseCallback(int event, int x, int y, int flags, void* userdata) {
         float angleRadiansX = rotationX * CV_PI / 180.0f; // Convert degrees to radians
         float angleRadiansY = rotationY * CV_PI / 180.0f;
 
+        params->hvb->clear();
+        params->hvb->Initialize();
+
         clock_t start = clock();    
         cv::Mat R = getRotationMatrix(angleRadiansX, angleRadiansY);
         rotateObj(params->loader, R); // Rotate the object
 
         // Redo ScanLine algorithm
         ListContruct(params->loader);
-        scanLine(params->zbuffer, *(params->APT), *(params->AET));
+        scanLine(params->hvb, *(params->APT), *(params->AET));
 
         cout << "Mouse moved to (" << x << ", " << y << ")" << endl;
         clock_t end = clock();
@@ -90,7 +95,7 @@ int main(int argc, char** argv)
     string path = "../models/";
     // load mesh
     if(argc == 1)
-        loader->LoadFile("../models/bunny/bunny.obj");
+        loader->LoadFile("../models/bunny.obj");
     else if(argc == 2)
     {
         path = path + argv[1];
@@ -99,10 +104,9 @@ int main(int argc, char** argv)
     }
     // scale to fit in image
     scaleObj(loader);
-    rotateObj(loader, getRotationMatrix(36*CV_PI/180.0, 25 * CV_PI / 180.0));
 
     // initialize z-buffer for one scan line
-    float* z_buffer = new float[image.cols];
+    HierarchicalZBuffer* hzb = new HierarchicalZBuffer(IMG_WIDTH, IMG_HEIGHT);
 
     // contruct polygon and edge list
     PT.resize(image.rows);
@@ -116,7 +120,7 @@ int main(int argc, char** argv)
     params.AET = &AET;
     params.APT = &APT;
     params.loader = loader;
-    params.zbuffer = z_buffer;
+    params.hvb = hzb;
 
     cv::namedWindow("Zbuffer");
     cv::setMouseCallback("Zbuffer", mouseCallback, &params);
@@ -124,7 +128,7 @@ int main(int argc, char** argv)
     // time record
     clock_t start = clock();
     ListContruct(loader);
-    scanLine(z_buffer, APT, AET);
+    scanLine(hzb, APT, AET);
     
     clock_t end = clock();
     cout << "Time: " << (double)(end - start) / CLOCKS_PER_SEC << "s" << endl;
@@ -135,6 +139,6 @@ int main(int argc, char** argv)
 
     waitKey(0);
 
-    delete[] z_buffer;
+    delete hzb;
 }
 

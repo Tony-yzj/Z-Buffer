@@ -11,9 +11,9 @@ using namespace cv;
 using namespace objl;
 
 
-#define SCALE 0.7
-#define IMG_WIDTH 800
-#define IMG_HEIGHT 600
+#define SCALE 0.8
+#define IMG_WIDTH 768
+#define IMG_HEIGHT 512
 
 
 #endif

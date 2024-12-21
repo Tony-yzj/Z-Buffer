@@ -1,7 +1,7 @@
 #pragma once
 //
 // Created by LEI XU on 4/28/19.
-//
+// Simplified by Zhoujun Ying 2024
 //
 // This loader is created by Robert Smith.
 // https://github.com/Bly7/OBJ-Loader
@@ -155,8 +155,6 @@ namespace objl
 		float Y;
 		float Z;
 	};
-
-	// �����һ�㵽ƽ���ͶӰ
 	inline Vector3 ProjectToPlane(const Vector3& point, const Vector3& planePoint, const Vector3& planeNormal) {
 		Vector3 v = point - planePoint;
 		float len = v.dot(planeNormal);
@@ -222,9 +220,9 @@ namespace objl
 
 	struct Triangle
 	{
-		std::string vidices[3];
-		std::string tidices[3];
-		std::string nidices[3];
+		std::string vidices[5];
+		std::string tidices[5];
+		std::string nidices[5];
 		std::vector<objl::Vertex> vertices;
 	};
 
@@ -490,20 +488,6 @@ namespace objl
 			LoadedVertices.clear();
 			LoadedIndices.clear();
 
-			// std::vector<Vector3> Positions;
-			// std::vector<Vector2> TCoords;
-			// std::vector<Vector3> Normals;
-
-			// std::vector<Vertex> Vertices;
-			// std::vector<unsigned int> Indices;
-
-			// std::vector<std::string> MeshMatNames;
-
-			// bool listening = false;
-			// std::string meshname;
-
-			// Mesh tempMesh;
-
 #ifdef OBJL_CONSOLE_OUTPUT
 			const unsigned int outputEveryNth = 1000;
 			unsigned int outputIndicator = outputEveryNth;
@@ -636,8 +620,15 @@ namespace objl
 						LoadedVertices.push_back(vVerts[i]);
 					}
 
-					Tri.vertices = vVerts;
-					LoadedTriangles.push_back(Tri);
+					int last = vVerts.size() - 1;
+					for(int i = 0; i < vVerts.size() - 2; i++)
+					{
+						Tri.vertices.push_back(vVerts[i]);
+						Tri.vertices.push_back(vVerts[i + 1]);
+						Tri.vertices.push_back(vVerts[last]);
+						LoadedTriangles.push_back(Tri);
+						Tri.vertices.clear();
+					}
 
 					std::vector<unsigned int> iIndices;
 
@@ -905,6 +896,9 @@ namespace objl
 				int vtype;
 
 				algorithm::split(sface[i], svert, "/");
+
+				if(svert[0] == "\r")
+					continue;
 
 				// Check for just position - v1
 				if (svert.size() == 1)

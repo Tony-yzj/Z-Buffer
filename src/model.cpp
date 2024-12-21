@@ -1,7 +1,11 @@
 #include "model.h"
 
 // Function to generate the combined rotation matrix
-cv::Mat getRotationMatrix(float angleX, float angleY) {
+// Parameters: angleX - rotation angle around the X-axis
+//             angleY - rotation angle around the Y-axis
+// Return value: Combined rotation matrix
+cv::Mat getRotationMatrix(float angleX, float angleY) 
+{
     // Rotation matrix for X-axis
     cv::Mat Rx = (cv::Mat_<float>(3, 3) <<
                   1, 0, 0,
@@ -18,18 +22,15 @@ cv::Mat getRotationMatrix(float angleX, float angleY) {
     return Ry * Rx;
 }
 
+// Function to scale the object
+// Parameters: loader - pointer to the Loader object, used to access model data
 void scaleObj(Loader* loader)
 {
+    // Initialize max and min values for X and Y coordinates
     float max_x = -FLT_MAX, max_y = -FLT_MAX;
     float min_x = FLT_MAX, min_y = FLT_MAX;
-    // for (int i = 0; i < loader->LoadedTriangles.size(); i++)
-    // {
-    //     Triangle triangle = loader->LoadedTriangles[i];
-    //     for (int j = 0; j < triangle.vertices.size(); j++)
-    //     {
-    //         loader->LoadedTriangles[i].vertices[j].Position.Y = -loader->LoadedTriangles[i].vertices[j].Position.Y;
-    //     }
-    // }
+
+    // Find the max and min values for X, Y, and Z coordinates
     for (int i = 0; i < loader->LoadedVertices.size(); i++)
     {
         max_x = max(max_x, loader->LoadedVertices[i].Position.X);
@@ -39,14 +40,20 @@ void scaleObj(Loader* loader)
         min_z = min(min_z, loader->LoadedVertices[i].Position.Z);
         max_z = max(max_z, loader->LoadedVertices[i].Position.Z);
     }
+
+    // Calculate scale factor based on the max differences in X and Y, and the image size
     float scale = min(IMG_HEIGHT, IMG_WIDTH) / max(max_x - min_x, max_y - min_y);
     scale *= SCALE;
+
+    // Calculate the center point of the object
     float center_x = (max_x + min_x) / 2;
     float center_y = (max_y + min_y) / 2;
     float center_z = (max_z + min_z) / 2;
 
+    // Reset max and min values for Z coordinate
     min_z = FLT_MAX, max_z = -FLT_MAX;
 
+    // Scale each vertex of the triangles based on the calculated scale factor and center point
     for (int i = 0; i < loader->LoadedTriangles.size(); i++)
     {
         Triangle triangle = loader->LoadedTriangles[i];
@@ -62,34 +69,40 @@ void scaleObj(Loader* loader)
     }
 }
 
+// Function to rotate the object
+// Parameters: loader - pointer to the Loader object, used to access model data
+//             rot - rotation matrix
 void rotateObj(Loader* loader, cv::Mat rot)
 {
+    // Reset max and min values for Z coordinate
     min_z = FLT_MAX;
     max_z = -FLT_MAX;
 
+    // Rotate each vertex and normal vector of the triangles based on the given rotation matrix
     for (int i = 0; i < loader->LoadedTriangles.size(); i++)
     {
         Triangle triangle = loader->LoadedTriangles[i];
         for (int j = 0; j < triangle.vertices.size(); j++)
         {
-
             Vertex &vertex = triangle.vertices[j];
+
+            // Rotate the vertex position
             cv::Mat p = (cv::Mat_<float>(3, 1) << vertex.Position.X - IMG_WIDTH/2, vertex.Position.Y - IMG_HEIGHT/2, vertex.Position.Z);
             p =  rot * p;
-
             loader->LoadedTriangles[i].vertices[j].Position.X = p.at<float>(0) + IMG_WIDTH/2;
             loader->LoadedTriangles[i].vertices[j].Position.Y = p.at<float>(1) + IMG_HEIGHT/2;
             loader->LoadedTriangles[i].vertices[j].Position.Z = p.at<float>(2);
-            
+
+            // Rotate the vertex normal
             cv::Mat n = (cv::Mat_<float>(3, 1) << vertex.Normal.X, vertex.Normal.Y, vertex.Normal.Z);
             n = rot * n;
             loader->LoadedTriangles[i].vertices[j].Normal.X = n.at<float>(0);
             loader->LoadedTriangles[i].vertices[j].Normal.Y = n.at<float>(1);
             loader->LoadedTriangles[i].vertices[j].Normal.Z = n.at<float>(2);
 
+            // Update max and min values for Z coordinate
             min_z = min(min_z, loader->LoadedTriangles[i].vertices[j].Position.Z);
             max_z = max(max_z, loader->LoadedTriangles[i].vertices[j].Position.Z);
         }
     }
 }
-

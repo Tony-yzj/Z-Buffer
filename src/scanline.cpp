@@ -1,4 +1,6 @@
 #include "scanline.h"
+#include "Features.h"
+#include "hierachy.h"
 
 void EdgeListContruct(Vector3 p1, Vector3 p2, int ymax, Polygon* id)
 {
@@ -91,14 +93,33 @@ void ListContruct(Loader* loader)
         polygon->id = i;
 
         // edge list construction
-        int min_y = INT_MAX, max_y = INT_MIN;
+        float min_y = INT_MAX, max_y = INT_MIN;
+        float min_x = INT_MAX, max_x = INT_MIN;
+        float pmin_z = INT_MAX, pmax_z = INT_MIN;
         polygon->depth = 0;
         for (int j = 0; j < triangle.vertices.size(); j++)
         {
-            min_y = min(min_y, (int)floor(triangle.vertices[j].Position.Y));
-            max_y = max(max_y, (int)floor(triangle.vertices[j].Position.Y));
+            min_y = min(min_y, floor(triangle.vertices[j].Position.Y));
+            max_y = max(max_y, floor(triangle.vertices[j].Position.Y));
+
+            // #ifdef HIERACHY
+            min_x = min(min_x, floor(triangle.vertices[j].Position.X));
+            max_x = max(max_x, floor(triangle.vertices[j].Position.X));
+            pmin_z = min(pmin_z, floor(triangle.vertices[j].Position.Z));
+            pmax_z = max(pmax_z, floor(triangle.vertices[j].Position.Z));
+            // #endif
+
             polygon->depth += triangle.vertices[j].Position.Z;
         }
+
+        // #ifdef HIERACHY
+        polygon->bbox.minX = min_x;
+        polygon->bbox.maxX = max_x;
+        polygon->bbox.minY = min_y;
+        polygon->bbox.maxY = max_y;
+        polygon->bbox.minZ = pmin_z;
+        polygon->bbox.maxZ = pmax_z;
+        // #endif
 
         for (int j = 0; j < triangle.vertices.size(); j++)
         {
@@ -187,9 +208,9 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
             image.at<Vec3b>(IMG_HEIGHT - 1 - y, j) = Vec3b(244, 234, 226);
         }
         
-
+        int size = AET.size();
         // update z buffer and color of pixels in the scan line
-        for (int i = 0; i < AET.size(); i++)
+        for (int i = 0; i < size; i++)
         {
             ActiveEdge& ae = AET[i];
             float zx = ae.zl;
@@ -227,7 +248,7 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
 
             if (AET[i].dyl < 0 && AET[i].dyr < 0)
             {
-                if(y == 0)
+                if(y <= 0)
                     break;
                 
                 Edge edge1, edge2;
@@ -241,13 +262,12 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
                         break;
                     }
                 }
-                if(j == ET[y-1].size())
-                {
-                    AET.erase(AET.begin() + i);
-                    i--;
-                }
-                else
+                if(j < ET[y-1].size())
                     addActiveEdge(AET, edge1, edge2, AET[i].id, y);
+                
+                AET.erase(AET.begin() + i);
+                i--;
+                size--;
             }
             else if (AET[i].dyl < 0)
             {
@@ -291,4 +311,163 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
                 APT.erase(APT.begin() + i);
         }
     }
+}
+
+void scanLine( HierarchicalZBuffer* hzb, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
+{
+    APT.clear();
+    AET.clear();
+    int cull_cnt = 0;
+    for (int i = 0; i < IMG_WIDTH; i++)
+    {
+        for(int j = 0; j < IMG_HEIGHT; j++)
+            image.at<Vec3b>(j, i) = Vec3b(244, 234, 226);
+    }
+    for (int y = IMG_HEIGHT - 1; y >= 0; y--)
+    {
+        // if new polygon is in the scan line, add it to active polygon list(APT)
+        for (int i = 0; i < (int)PT[y].size(); i++)
+        {
+            assert(i >= 0);
+            Polygon *polygon = PT[y][i];
+
+            if (!hzb->IsVisible(*polygon))
+            {
+                cull_cnt++;
+                continue;
+            }
+
+            // add edges intersected with the scan line into active edge list(AET)
+            ActiveEdge ae;
+            Edge edge1, edge2;
+            ae.id = PT[y][i];
+
+            // find edge in current polygon with max y
+            for (int j = 0; j < ET[y].size(); j++)
+            {
+                if (ET[y][j].id == PT[y][i])
+                {
+                    edge1 = ET[y][j];
+                    edge2 = ET[y][j + 1];
+                    break;
+                }
+            }
+
+            addActiveEdge(AET, edge1, edge2, polygon, y);
+            // APT.push_back(polygon);
+
+            // update z buffer and color of pixels in the scan line
+            int ynow = y;
+            while(polygon->dy >= 0 && ynow > 0)
+            {   
+                int size = AET.size();
+                for (int i = 0; i < size; i++)
+                {
+                    ActiveEdge& ae = AET[i];
+                    float zx = ae.zl;
+                    int left = (int)floor(ae.xl), right = (int)floor(ae.xr);
+
+                    if(left < 0)
+                    {
+                        left = 0;
+                        zx += ae.dzx * (0 - ae.xl);
+                    }    
+                    else if(left > IMG_WIDTH - 1)
+                        left = IMG_WIDTH - 1;
+
+                    if(right < 0)
+                        right = 0;
+                    else if(right > IMG_WIDTH - 1)
+                        right = IMG_WIDTH - 1;
+
+                    for(int j = left; j <= right; j++)
+                    {
+                        if (zx > hzb->at(j, ynow, 0))
+                        {
+                            image.at<Vec3b>((IMG_HEIGHT - 1 - ynow), j) = ae.id->color;
+                            hzb->Update(j, ynow, zx);
+                        }
+                        zx += ae.dzx;
+                    }
+
+                    // update AET
+                    AET[i].xl += ae.dxl;
+                    AET[i].xr += ae.dxr;
+                    AET[i].zl += ae.dzx * ae.dxl + ae.dzy;
+                    AET[i].dyl -= 1;
+                    AET[i].dyr -= 1;
+
+                    if (AET[i].dyl < 0 && AET[i].dyr < 0)
+                    {
+                        if(ynow<=0)
+                        {
+                            break;
+                        }
+                        
+                        Edge edge1, edge2;
+                        int j = 0;
+                        for(j = 0; j < ET[ynow-1].size(); j++)
+                        {
+                            if(AET[i].id == ET[ynow-1][j].id)
+                            {
+                                edge1 = ET[ynow-1][j];
+                                edge2 = ET[ynow-1][j+1];
+                                break;
+                            }
+                        }
+                        if(j < ET[ynow-1].size())
+                            addActiveEdge(AET, edge1, edge2, AET[i].id, ynow);
+                        AET.erase(AET.begin() + i);
+                        i--;
+                        size--;
+                    }
+                    else if (AET[i].dyl < 0)
+                    {
+                        if(ynow<=0)
+                        {
+                            AET.erase(AET.begin() + i);
+                            i--;
+                            break;
+                        }
+                        for (int j = 0; j < ET[ynow-1].size(); j++)
+                        {
+                            if (AET[i].id == ET[ynow-1][j].id)
+                            {
+                                Edge edge = ET[ynow-1][j];
+                                AET[i].xl = edge.x;
+                                AET[i].dxl = edge.dx;
+                                AET[i].dyl = edge.dy;
+                                break;
+                            }
+                        }
+                    }
+                    else if (AET[i].dyr < 0)
+                    {
+                        if(ynow<=0)
+                        {
+                            AET.erase(AET.begin() + i);
+                            i--;
+                            break;
+                        }
+                        for (int j = 0; j < ET[ynow - 1].size(); j++)
+                        {
+                            if (AET[i].id == ET[ynow - 1][j].id)
+                            {
+                                Edge edge = ET[ynow - 1][j];
+                                AET[i].xr = edge.x;
+                                AET[i].dxr = edge.dx;
+                                AET[i].dyr = edge.dy;
+                                break;
+                            }
+                        }
+                    }
+                }
+                polygon->dy--;
+                ynow--;
+            }
+            AET.clear();
+        }
+    }
+
+    cout << "cull_cnt: " << cull_cnt << endl;
 }

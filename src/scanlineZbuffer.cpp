@@ -25,7 +25,7 @@ struct MouseParams {
 std::vector<std::vector<Polygon*>> PT;
 std::vector<std::vector<Edge>> ET;
 // initial image
-Mat image(IMG_HEIGHT, IMG_WIDTH, CV_8UC3, Vec3b(0, 0, 0));
+Mat image(IMG_HEIGHT, IMG_WIDTH, CV_8UC3, Vec3b(244, 234, 226));
 float min_z = FLT_MAX, max_z = -FLT_MAX;
 Point prevMousePos;     // Previous mouse position
 bool isDragging = false;    // Flag to check if dragging
@@ -91,7 +91,7 @@ int main(int argc, char** argv)
     string path = "../models/";
     // load mesh
     if(argc == 1)
-        loader->LoadFile("../models/bunny/bunny.obj");
+        loader->LoadFile("../models/bunny.obj");
     else if(argc == 2)
     {
         path = path + argv[1];
