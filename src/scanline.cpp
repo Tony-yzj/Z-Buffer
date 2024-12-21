@@ -1,6 +1,8 @@
 #include "scanline.h"
 #include "Features.h"
 #include "hierachy.h"
+#include "readObj.h"
+#include <opencv2/core/matx.hpp>
 
 void EdgeListContruct(Vector3 p1, Vector3 p2, int ymax, Polygon* id)
 {
@@ -62,27 +64,27 @@ void ClearTable()
         {
             delete PT[i][j];
         }
+        PT[i].clear();
+        ET[i].clear();
     }
-    PT.clear();
-    ET.clear();
-    PT.resize(IMG_HEIGHT);
-    ET.resize(IMG_HEIGHT);  
 }
-void ListContruct(Loader* loader)
+void ListContruct(vector<Triangle>* faces)
 {
-    // Clear PT & ET
-    ClearTable();
-
-    for (int i = 0; i < loader->LoadedTriangles.size(); i++)
+    for (int i = 0; i < (*faces).size(); i++)
     {
         Polygon* polygon = new Polygon();
-        Triangle triangle = loader->LoadedTriangles[i];
+        Triangle triangle = (*faces)[i];
         
         // calculate params
         Vector3 p = triangle.vertices[0].Position;
         Vector3 normal = triangle.vertices[0].Normal;
 
-        polygon->calculate_params(RoundVertex(triangle.vertices[0].Position), RoundVertex(triangle.vertices[1].Position), RoundVertex(triangle.vertices[2].Position), normal);
+        for(int j = 0; j < triangle.vertices.size(); j++)
+        {
+            triangle.vertices[j].Position = RoundVertex(triangle.vertices[j].Position);
+        }
+
+        polygon->calculate_params((triangle.vertices[0].Position), (triangle.vertices[1].Position), (triangle.vertices[2].Position), normal);
 
         #ifdef CULL_ENBALE
         // Cull
@@ -123,8 +125,8 @@ void ListContruct(Loader* loader)
 
         for (int j = 0; j < triangle.vertices.size(); j++)
         {
-            Vector3 p1 = RoundVertex(triangle.vertices[j].Position);
-            Vector3 p2 = RoundVertex((j == (int)triangle.vertices.size() - 1) ? triangle.vertices[0].Position : triangle.vertices[j + 1].Position);
+            Vector3 p1 = (triangle.vertices[j].Position);
+            Vector3 p2 = ((j == (int)triangle.vertices.size() - 1) ? triangle.vertices[0].Position : triangle.vertices[j + 1].Position);
 
             EdgeListContruct(p1, p2, max_y, polygon);
         }
@@ -174,6 +176,7 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
 {
     APT.clear();
     AET.clear();
+    fill(image.begin<Vec3b>(), image.end<Vec3b>(), Vec3b(244, 234, 226));
     for (int y = IMG_HEIGHT - 1; y >= 0; y--)
     {
         // if new polygon is in the scan line, add it to active polygon list(APT)
@@ -201,12 +204,8 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
             APT.push_back(polygon);
         }
 
-        // initialize z buffer as min_z if there are active edges
-        for (int j = 0; j < image.cols; j++)
-        {
-            z_buffer[j] = -FLT_MAX;
-            image.at<Vec3b>(IMG_HEIGHT - 1 - y, j) = Vec3b(244, 234, 226);
-        }
+        for(int i = 0; i < IMG_WIDTH; i++)
+            z_buffer[i] = -FLT_MAX;
         
         int size = AET.size();
         // update z buffer and color of pixels in the scan line
@@ -311,18 +310,16 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
                 APT.erase(APT.begin() + i);
         }
     }
+    // Clear PT & ET
+    ClearTable();
 }
 
 void scanLine( HierarchicalZBuffer* hzb, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
 {
-    APT.clear();
     AET.clear();
     int cull_cnt = 0;
-    for (int i = 0; i < IMG_WIDTH; i++)
-    {
-        for(int j = 0; j < IMG_HEIGHT; j++)
-            image.at<Vec3b>(j, i) = Vec3b(244, 234, 226);
-    }
+
+    fill(image.begin<Vec3b>(), image.end<Vec3b>(), Vec3b(244, 234, 226));
     for (int y = IMG_HEIGHT - 1; y >= 0; y--)
     {
         // if new polygon is in the scan line, add it to active polygon list(APT)
@@ -354,7 +351,6 @@ void scanLine( HierarchicalZBuffer* hzb, vector<Polygon*>& APT, vector<ActiveEdg
             }
 
             addActiveEdge(AET, edge1, edge2, polygon, y);
-            // APT.push_back(polygon);
 
             // update z buffer and color of pixels in the scan line
             int ynow = y;
@@ -425,8 +421,6 @@ void scanLine( HierarchicalZBuffer* hzb, vector<Polygon*>& APT, vector<ActiveEdg
                     {
                         if(ynow<=0)
                         {
-                            AET.erase(AET.begin() + i);
-                            i--;
                             break;
                         }
                         for (int j = 0; j < ET[ynow-1].size(); j++)
@@ -445,8 +439,6 @@ void scanLine( HierarchicalZBuffer* hzb, vector<Polygon*>& APT, vector<ActiveEdg
                     {
                         if(ynow<=0)
                         {
-                            AET.erase(AET.begin() + i);
-                            i--;
                             break;
                         }
                         for (int j = 0; j < ET[ynow - 1].size(); j++)
@@ -470,4 +462,6 @@ void scanLine( HierarchicalZBuffer* hzb, vector<Polygon*>& APT, vector<ActiveEdg
     }
 
     cout << "cull_cnt: " << cull_cnt << endl;
+    // Clear PT & ET
+    ClearTable();
 }

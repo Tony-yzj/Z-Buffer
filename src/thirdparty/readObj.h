@@ -21,7 +21,7 @@
 typedef std::pair<double, double> pdd2;
 
 // Print progress to console while loading (large models)
-#define OBJL_CONSOLE_OUTPUT
+// #define OBJL_CONSOLE_OUTPUT
 
 // Namespace: OBJL
 //
@@ -220,9 +220,6 @@ namespace objl
 
 	struct Triangle
 	{
-		std::string vidices[5];
-		std::string tidices[5];
-		std::string nidices[5];
 		std::vector<objl::Vertex> vertices;
 	};
 
@@ -812,33 +809,33 @@ namespace objl
 
 			for (auto Triangle : LoadedTriangles)
 			{
-				switch (vtype)
-				{
-				case 1: // p only
-					/* code */
-					file << "f " << Triangle.vidices[0] << " " << Triangle.vidices[1] << " " << Triangle.vidices[2] << "\n";
-					break;
-				case 2: // p/t
-					/* code */
-					file << "f " << Triangle.vidices[0] << "/" << Triangle.tidices[0] << " "
-						<< Triangle.vidices[1] << "/" << Triangle.tidices[1] << " "
-						<< Triangle.vidices[2] << "/" << Triangle.tidices[2] << "\n";
-					break;
-				case 3: // p//n
-					/* code */
-					file << "f " << Triangle.vidices[0] << "//" << Triangle.nidices[0] << " "
-						<< Triangle.vidices[1] << "//" << Triangle.nidices[1] << " "
-						<< Triangle.vidices[2] << "//" << Triangle.nidices[2] << "\n";
-					break;
-				case 4: // p/t/n
-					/* code */
-					file << "f " << Triangle.vidices[0] << "/" << Triangle.tidices[0] << "/" << Triangle.nidices[0] << " "
-						<< Triangle.vidices[1] << "/" << Triangle.tidices[1] << "/" << Triangle.nidices[1] << " "
-						<< Triangle.vidices[2] << "/" << Triangle.tidices[2] << "/" << Triangle.nidices[2] << "\n";
-					break;
-				default:
-					break;
-				}
+				// switch (vtype)
+				// {
+				// case 1: // p only
+				// 	/* code */
+				// 	file << "f " << Triangle.vidices[0] << " " << Triangle.vidices[1] << " " << Triangle.vidices[2] << "\n";
+				// 	break;
+				// case 2: // p/t
+				// 	/* code */
+				// 	file << "f " << Triangle.vidices[0] << "/" << Triangle.tidices[0] << " "
+				// 		<< Triangle.vidices[1] << "/" << Triangle.tidices[1] << " "
+				// 		<< Triangle.vidices[2] << "/" << Triangle.tidices[2] << "\n";
+				// 	break;
+				// case 3: // p//n
+				// 	/* code */
+				// 	file << "f " << Triangle.vidices[0] << "//" << Triangle.nidices[0] << " "
+				// 		<< Triangle.vidices[1] << "//" << Triangle.nidices[1] << " "
+				// 		<< Triangle.vidices[2] << "//" << Triangle.nidices[2] << "\n";
+				// 	break;
+				// case 4: // p/t/n
+				// 	/* code */
+				// 	file << "f " << Triangle.vidices[0] << "/" << Triangle.tidices[0] << "/" << Triangle.nidices[0] << " "
+				// 		<< Triangle.vidices[1] << "/" << Triangle.tidices[1] << "/" << Triangle.nidices[1] << " "
+				// 		<< Triangle.vidices[2] << "/" << Triangle.tidices[2] << "/" << Triangle.nidices[2] << "\n";
+				// 	break;
+				// default:
+				// 	break;
+				// }
 
 			}
 
@@ -939,7 +936,7 @@ namespace objl
 					vVert.Position = algorithm::getElement(iPositions, svert[0]);
 					vVert.TextureCoordinate = Vector2(0, 0);
 					noNormal = true;
-					tri.vidices[i] = svert[0];
+					// tri.vidices[i] = svert[0];
 					oVerts.push_back(vVert);
 					break;
 				}
@@ -948,8 +945,8 @@ namespace objl
 					vVert.Position = algorithm::getElement(iPositions, svert[0]);
 					vVert.TextureCoordinate = algorithm::getElement(iTCoords, svert[1]);
 					noNormal = true;
-					tri.vidices[i] = svert[0];
-					tri.tidices[i] = svert[1];
+					// tri.vidices[i] = svert[0];
+					// tri.tidices[i] = svert[1];
 					oVerts.push_back(vVert);
 					break;
 				}
@@ -958,8 +955,8 @@ namespace objl
 					vVert.Position = algorithm::getElement(iPositions, svert[0]);
 					vVert.TextureCoordinate = Vector2(0, 0);
 					vVert.Normal = algorithm::getElement(iNormals, svert[2]);
-					tri.vidices[i] = svert[0];
-					tri.nidices[i] = svert[2];
+					// tri.vidices[i] = svert[0];
+					// tri.nidices[i] = svert[2];
 					oVerts.push_back(vVert);
 					break;
 				}
@@ -968,9 +965,9 @@ namespace objl
 					vVert.Position = algorithm::getElement(iPositions, svert[0]);
 					vVert.TextureCoordinate = algorithm::getElement(iTCoords, svert[1]);
 					vVert.Normal = algorithm::getElement(iNormals, svert[2]);
-					tri.vidices[i] = svert[0];
-					tri.tidices[i] = svert[1];
-					tri.nidices[i] = svert[2];
+					// tri.vidices[i] = svert[0];
+					// tri.tidices[i] = svert[1];
+					// tri.nidices[i] = svert[2];
 					oVerts.push_back(vVert);
 					break;
 				}

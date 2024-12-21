@@ -26,7 +26,9 @@ public:
 
     float at(int x, int y, int level);
 
-    void clear();
+    void Clear();
+
+    void Reset();
 
 private:
     std::vector<std::vector<float>> z_pyramid;  // The Z pyramid, containing Z buffers for each level

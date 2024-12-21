@@ -1,4 +1,5 @@
 #include "model.h"
+#include "readObj.h"
 
 // Function to generate the combined rotation matrix
 // Parameters: angleX - rotation angle around the X-axis
@@ -72,16 +73,16 @@ void scaleObj(Loader* loader)
 // Function to rotate the object
 // Parameters: loader - pointer to the Loader object, used to access model data
 //             rot - rotation matrix
-void rotateObj(Loader* loader, cv::Mat rot)
+void rotateObj(vector<Triangle>* faces, cv::Mat rot)
 {
     // Reset max and min values for Z coordinate
     min_z = FLT_MAX;
     max_z = -FLT_MAX;
 
     // Rotate each vertex and normal vector of the triangles based on the given rotation matrix
-    for (int i = 0; i < loader->LoadedTriangles.size(); i++)
+    for (int i = 0; i < (*faces).size(); i++)
     {
-        Triangle triangle = loader->LoadedTriangles[i];
+        Triangle triangle = (*faces)[i];
         for (int j = 0; j < triangle.vertices.size(); j++)
         {
             Vertex &vertex = triangle.vertices[j];
@@ -89,20 +90,20 @@ void rotateObj(Loader* loader, cv::Mat rot)
             // Rotate the vertex position
             cv::Mat p = (cv::Mat_<float>(3, 1) << vertex.Position.X - IMG_WIDTH/2, vertex.Position.Y - IMG_HEIGHT/2, vertex.Position.Z);
             p =  rot * p;
-            loader->LoadedTriangles[i].vertices[j].Position.X = p.at<float>(0) + IMG_WIDTH/2;
-            loader->LoadedTriangles[i].vertices[j].Position.Y = p.at<float>(1) + IMG_HEIGHT/2;
-            loader->LoadedTriangles[i].vertices[j].Position.Z = p.at<float>(2);
+            (*faces)[i].vertices[j].Position.X = p.at<float>(0) + IMG_WIDTH/2;
+            (*faces)[i].vertices[j].Position.Y = p.at<float>(1) + IMG_HEIGHT/2;
+            (*faces)[i].vertices[j].Position.Z = p.at<float>(2);
 
             // Rotate the vertex normal
             cv::Mat n = (cv::Mat_<float>(3, 1) << vertex.Normal.X, vertex.Normal.Y, vertex.Normal.Z);
             n = rot * n;
-            loader->LoadedTriangles[i].vertices[j].Normal.X = n.at<float>(0);
-            loader->LoadedTriangles[i].vertices[j].Normal.Y = n.at<float>(1);
-            loader->LoadedTriangles[i].vertices[j].Normal.Z = n.at<float>(2);
+            (*faces)[i].vertices[j].Normal.X = n.at<float>(0);
+            (*faces)[i].vertices[j].Normal.Y = n.at<float>(1);
+            (*faces)[i].vertices[j].Normal.Z = n.at<float>(2);
 
             // Update max and min values for Z coordinate
-            min_z = min(min_z, loader->LoadedTriangles[i].vertices[j].Position.Z);
-            max_z = max(max_z, loader->LoadedTriangles[i].vertices[j].Position.Z);
+            min_z = min(min_z, (*faces)[i].vertices[j].Position.Z);
+            max_z = max(max_z, (*faces)[i].vertices[j].Position.Z);
         }
     }
 }

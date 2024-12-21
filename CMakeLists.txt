@@ -14,6 +14,12 @@ if(APPLE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall -Wextra")
 endif()
 
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(zbuffer PUBLIC OpenMP::OpenMP_CXX)
+    target_link_libraries(hierachyZbuffer PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
 # 添加 include 和 src 目录
 include_directories(${PROJECT_SOURCE_DIR}/src/include)
 include_directories(${PROJECT_SOURCE_DIR}/src/thirdparty)

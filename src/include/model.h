@@ -1,4 +1,5 @@
 #pragma once
+#include "readObj.h"
 #ifndef MODEL_H
 #define MODEL_H
 
@@ -11,6 +12,6 @@ cv::Mat getRotationMatrix(float angleX, float angleY);
 
 void scaleObj(Loader* loader);
 
-void rotateObj(Loader* loader, cv::Mat rot);
+void rotateObj(vector<Triangle> * faces, cv::Mat rot);
 
 #endif

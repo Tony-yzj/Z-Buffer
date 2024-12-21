@@ -4,7 +4,6 @@
 // Constructor: Initializes width and height, and builds the Z pyramid
 HierarchicalZBuffer::HierarchicalZBuffer(int width, int height)
     : width(width), height(height) {
-    Initialize();
 }
 
 // Initializes the Z pyramid and constructs Z buffers for each level
@@ -25,6 +24,14 @@ void HierarchicalZBuffer::Initialize() {
     }
 }
 
+void HierarchicalZBuffer::Reset()
+{
+    for(int i = 0; i < z_pyramid.size(); i++)
+    {
+        fill(z_pyramid[i].begin(), z_pyramid[i].end(), -FLT_MAX);
+    }
+}
+
 // Updates the Z buffer in the pyramid for a specific pixel (x, y) with a new depth value
 void HierarchicalZBuffer::Update(int x, int y, float new_z) 
 {
@@ -33,7 +40,7 @@ void HierarchicalZBuffer::Update(int x, int y, float new_z)
 
     int current_width = width, current_height = height;
     // Propagate the update upwards to higher levels
-    for (int level = 1; level < z_pyramid.size(); ++level) 
+    for (int level = 1; level < z_pyramid.size() - 2; ++level) 
     {
         x /= 2;
         y /= 2;
@@ -46,6 +53,9 @@ void HierarchicalZBuffer::Update(int x, int y, float new_z)
             z_pyramid[level - 1][(y * 2 + 1) * current_width + x * 2],
             z_pyramid[level - 1][(y * 2 + 1) * current_width + x * 2 + 1]
         });
+
+        // if(min_z != -FLT_MAX)
+        //     cout << "min_z: " << min_z << endl;
 
         // If the updated value is equal to the max value, stop propagating
         if (z_pyramid[level][index] == min_z) break;
@@ -68,12 +78,11 @@ bool HierarchicalZBuffer::IsVisible(Polygon& polygon)
     int max_y = bbox.maxY;
 
     float min_depth = bbox.maxZ;
-    float max_depth = bbox.minZ;
 
     // Traverse the Z pyramid from coarse (higher levels) to fine (lower levels)
-    for (int level = GetNumLevels() - 1; level >= 0; --level) {
+    for (int level = GetNumLevels() - 3; level >= 1; --level) 
+    {
         int pyramid_width = width >> level;
-        int pyramid_height = height >> level;
 
         int start_x = min_x >> level;
         int start_y = min_y >> level;
@@ -83,24 +92,35 @@ bool HierarchicalZBuffer::IsVisible(Polygon& polygon)
         bool is_occluded = true;
 
         // Check the Z buffer at the current pyramid level
-        for (int y = start_y; y <= end_y; ++y) {
-            for (int x = start_x; x <= end_x; ++x) {
-                // If any part of the polygon is not occluded, continue checking at finer levels
-                // the polygon is ocluded if polygon's min depth < z_buffer's depth
-                if (min_depth  > z_pyramid[level][y * pyramid_width + x]) {
-                    is_occluded = false;
-                    break;
-                }
-            }
-            if (!is_occluded) break;
+        if(start_x == end_x && start_y == end_y)
+        {
+            is_occluded = min_depth < z_pyramid[level][start_y * pyramid_width + start_x];
         }
+        else 
+        {
+            break;
+        }
+        // for (int y = start_y; y <= end_y; ++y) {
+        //     for (int x = start_x; x <= end_x; ++x) {
+        //         // If any part of the polygon is not occluded, continue checking at finer levels
+        //         // the polygon is ocluded if polygon's min depth < z_buffer's depth
+                
+        //         if (min_depth >= z_pyramid[level][y * pyramid_width + x]) 
+        //         {
+        //             is_occluded = false;
+        //             break;
+        //         }
+        //     }
+        //     if (is_occluded) break;
+        // }
 
-        // If the polygon is visible at this level, stop and return true
-        if (!is_occluded) {
-            return true;
+        // If the polygon is occlueded, return false
+        if (is_occluded) 
+        {
+            return false;
         }
     }
-    return false; // If it's occluded
+    return true; // If it's not occluded
 }
 
 // Gets the depth value from the lowest level (highest resolution) of the Z pyramid
@@ -121,7 +141,7 @@ float HierarchicalZBuffer::at(int x, int y, int level)
     return z_pyramid[level][y * current_width + x];
 }
 
-void HierarchicalZBuffer::clear()
+void HierarchicalZBuffer::Clear()
 {
     z_pyramid.clear();
 }

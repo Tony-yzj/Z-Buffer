@@ -1,6 +1,8 @@
 ﻿#include <algorithm>
 #include <cassert>
 #include <cfloat>
+#include <cmath>
+#include <ctime>
 #include <iostream>
 #include <opencv2/core/cvdef.h>
 #include <opencv2/core/matx.hpp>
@@ -16,7 +18,7 @@ using namespace cv;
 using namespace objl;
 
 struct MouseParams {
-    Loader* loader;
+    vector<Triangle>* faces;
     float* zbuffer;
     vector<Polygon*> *APT;
     vector<ActiveEdge> * AET;
@@ -33,6 +35,7 @@ bool isDragging = false;    // Flag to check if dragging
 float rotationX = 0.0f;     // Rotation angle around X-axis
 float rotationY = 0.0f;     // Rotation angle around Y-axis
 Vector3 cameraDirect(0, 0, -1);
+Vector3 lightDirect(-sqrt(2)/2, 0, -sqrt(2)/2);
 
 void mouseCallback(int event, int x, int y, int flags, void* userdata) {
     // transfer userdata to mouseCallback Params
@@ -60,12 +63,12 @@ void mouseCallback(int event, int x, int y, int flags, void* userdata) {
         float angleRadiansX = rotationX * CV_PI / 180.0f; // Convert degrees to radians
         float angleRadiansY = rotationY * CV_PI / 180.0f;
 
-        clock_t start = clock();    
         cv::Mat R = getRotationMatrix(angleRadiansX, angleRadiansY);
-        rotateObj(params->loader, R); // Rotate the object
+        rotateObj(params->faces, R); // Rotate the object
 
         // Redo ScanLine algorithm
-        ListContruct(params->loader);
+        clock_t start = clock();    
+        ListContruct(params->faces);
         scanLine(params->zbuffer, *(params->APT), *(params->AET));
 
         cout << "Mouse moved to (" << x << ", " << y << ")" << endl;
@@ -89,17 +92,26 @@ int main(int argc, char** argv)
 
     Loader* loader = new Loader();
     string path = "../models/";
-    // load mesh
+        // load mesh
     if(argc == 1)
-        loader->LoadFile("../models/bunny.obj");
+    {
+        if(!loader->LoadFile("../models/bunny.obj"))
+            cout << "Loaded File Fail." << endl;
+    }
     else if(argc == 2)
     {
         path = path + argv[1];
         path = path + ".obj";
-        loader->LoadFile(path);
+        if(!loader->LoadFile(path))
+            cout << "Loaded File Fail." << endl;
     }
+
+    cout << "Loaded File Success." << endl;
+    cout << "Number of Polygons: " << loader->LoadedTriangles.size() << endl;
     // scale to fit in image
     scaleObj(loader);
+
+    vector<Triangle> faces = loader->LoadedTriangles;
 
     // initialize z-buffer for one scan line
     float* z_buffer = new float[image.cols];
@@ -115,7 +127,7 @@ int main(int argc, char** argv)
     MouseParams params;
     params.AET = &AET;
     params.APT = &APT;
-    params.loader = loader;
+    params.faces = &faces;
     params.zbuffer = z_buffer;
 
     cv::namedWindow("Zbuffer");
@@ -123,8 +135,14 @@ int main(int argc, char** argv)
 
     // time record
     clock_t start = clock();
-    ListContruct(loader);
+    clock_t construct_s = clock();
+    ListContruct(&faces);
+    clock_t construct_e = clock();
+    cout << "Construct Time: " << (double)(construct_e - construct_s) / CLOCKS_PER_SEC << "s" << endl;
+    clock_t scan_s = clock();
     scanLine(z_buffer, APT, AET);
+    clock_t scan_e = clock();
+    cout << "Scan Time: " << (double)(scan_e - scan_s) / CLOCKS_PER_SEC << "s" << endl;
     
     clock_t end = clock();
     cout << "Time: " << (double)(end - start) / CLOCKS_PER_SEC << "s" << endl;

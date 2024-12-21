@@ -1,6 +1,7 @@
 ﻿#include <algorithm>
 #include <cassert>
 #include <cfloat>
+#include <ctime>
 #include <iostream>
 #include <opencv2/core/cvdef.h>
 #include <opencv2/core/matx.hpp>
@@ -10,6 +11,7 @@
 
 #include "Features.h"
 #include "hierachy.h"
+#include "readObj.h"
 #include "scanline.h"
 #define HIERACHY 1
 
@@ -18,7 +20,7 @@ using namespace cv;
 using namespace objl;
 
 struct MouseParams {
-    Loader* loader;
+    vector<Triangle> *faces;
     HierarchicalZBuffer* hvb;
     vector<Polygon*> *APT;
     vector<ActiveEdge> * AET;
@@ -35,6 +37,7 @@ bool isDragging = false;    // Flag to check if dragging
 float rotationX = 0.0f;     // Rotation angle around X-axis
 float rotationY = 0.0f;     // Rotation angle around Y-axis
 Vector3 cameraDirect(0, 0, -1);
+Vector3 lightDirect(-sqrt(2)/2, 0, -sqrt(2)/2);
 void mouseCallback(int event, int x, int y, int flags, void* userdata) {
     // transfer userdata to mouseCallback Params
     MouseParams* params = static_cast<MouseParams*>(userdata);
@@ -61,15 +64,14 @@ void mouseCallback(int event, int x, int y, int flags, void* userdata) {
         float angleRadiansX = rotationX * CV_PI / 180.0f; // Convert degrees to radians
         float angleRadiansY = rotationY * CV_PI / 180.0f;
 
-        params->hvb->clear();
-        params->hvb->Initialize();
+        params->hvb->Reset();
 
-        clock_t start = clock();    
         cv::Mat R = getRotationMatrix(angleRadiansX, angleRadiansY);
-        rotateObj(params->loader, R); // Rotate the object
+        rotateObj(params->faces, R); // Rotate the object
 
         // Redo ScanLine algorithm
-        ListContruct(params->loader);
+        clock_t start = clock();    
+        ListContruct(params->faces);
         scanLine(params->hvb, *(params->APT), *(params->AET));
 
         cout << "Mouse moved to (" << x << ", " << y << ")" << endl;
@@ -95,15 +97,24 @@ int main(int argc, char** argv)
     string path = "../models/";
     // load mesh
     if(argc == 1)
-        loader->LoadFile("../models/bunny.obj");
+    {
+        if(!loader->LoadFile("../models/bunny.obj"))
+            cout << "Loaded File Fail." << endl;
+    }
     else if(argc == 2)
     {
         path = path + argv[1];
         path = path + ".obj";
-        loader->LoadFile(path);
+        if(!loader->LoadFile(path))
+            cout << "Loaded File Fail." << endl;
     }
+
+    cout << "Loaded File Success." << endl;
+    cout << "Number of Polygons: " << loader->LoadedTriangles.size() << endl;
     // scale to fit in image
     scaleObj(loader);
+
+    vector<Triangle> faces = loader->LoadedTriangles;
 
     // initialize z-buffer for one scan line
     HierarchicalZBuffer* hzb = new HierarchicalZBuffer(IMG_WIDTH, IMG_HEIGHT);
@@ -119,7 +130,7 @@ int main(int argc, char** argv)
     MouseParams params;
     params.AET = &AET;
     params.APT = &APT;
-    params.loader = loader;
+    params.faces = &faces;
     params.hvb = hzb;
 
     cv::namedWindow("Zbuffer");
@@ -127,8 +138,16 @@ int main(int argc, char** argv)
 
     // time record
     clock_t start = clock();
-    ListContruct(loader);
+    clock_t init_s = clock();
+    hzb->Initialize();
+    cout << "Initialize Time: " << (double)(clock() - init_s) / CLOCKS_PER_SEC << "s" << endl;
+    clock_t construct_s = clock();
+    ListContruct(&faces);
+    cout << "Construct Time: " << (double)(clock() - construct_s) / CLOCKS_PER_SEC << "s" << endl;
+    clock_t scan_s = clock();
     scanLine(hzb, APT, AET);
+    cout << "Scan Time: " << (double)(clock() - scan_s) / CLOCKS_PER_SEC << "s" << endl;
+
     
     clock_t end = clock();
     cout << "Time: " << (double)(end - start) / CLOCKS_PER_SEC << "s" << endl;

@@ -12,7 +12,7 @@ using namespace objl;
 
 
 #define SCALE 0.8
-#define IMG_WIDTH 768
+#define IMG_WIDTH 512
 #define IMG_HEIGHT 512
 
 
