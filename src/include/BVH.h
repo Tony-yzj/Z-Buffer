@@ -17,7 +17,7 @@ struct BVHNode {
 };
 
 BoundingBox combineBoundingBoxes(const BoundingBox &a, const BoundingBox &b);
-BVHNode* buildBVH(std::vector<Polygon*> &polygons, int start, int end, int depth = 0);
+BVHNode* buildBVH(std::vector<Polygon*> &polygons, int start, int end, int capacity, int depth = 0);
 BVHNode* constructBVHTree(std::vector<Polygon*> &polygons);
 void freeBVHTree(BVHNode* node);
 

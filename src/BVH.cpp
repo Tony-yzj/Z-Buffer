@@ -1,4 +1,6 @@
 #include "BVH.h"
+#include "struct.h"
+#include <cstring>
 
 BoundingBox combineBoundingBoxes(const BoundingBox &a, const BoundingBox &b) {
     BoundingBox combined;
@@ -10,8 +12,7 @@ BoundingBox combineBoundingBoxes(const BoundingBox &a, const BoundingBox &b) {
     combined.maxZ = std::max(a.maxZ, b.maxZ);
     return combined;
 }
-
-BVHNode* buildBVH(std::vector<Polygon*> &polygons, int start, int end, int depth) {
+BVHNode* buildBVH(std::vector<Polygon*> &polygons, int start, int end, int capacity, int depth) {
     BVHNode* node = new BVHNode;
 
     // Compute the bounding box for the current set of polygons
@@ -22,7 +23,7 @@ BVHNode* buildBVH(std::vector<Polygon*> &polygons, int start, int end, int depth
 
     // Base case: if only one polygon, create a leaf node
     int numPolygons = end - start;
-    if (numPolygons < 10) {
+    if (numPolygons <= capacity) {
         for(int i = start; i < end; i++)
             node->polygons.push_back(polygons[i]);
         node->left = node->right = nullptr;
@@ -34,9 +35,9 @@ BVHNode* buildBVH(std::vector<Polygon*> &polygons, int start, int end, int depth
 
     // Sort polygons along the chosen axis
     auto comparator = [axis](const Polygon* a, const Polygon* b) {
-        if (axis == 0) return a->bbox.minX < b->bbox.minX;
-        if (axis == 1) return a->bbox.minY < b->bbox.minY;
-        return a->bbox.minZ < b->bbox.minZ;
+        if (axis == 1) return a->bbox.minX < b->bbox.minX;
+        if (axis == 2) return a->bbox.minY < b->bbox.minY;
+        return a->bbox.maxZ > b->bbox.maxZ;
     };
     std::sort(polygons.begin() + start, polygons.begin() + end, comparator);
 
@@ -51,7 +52,7 @@ BVHNode* buildBVH(std::vector<Polygon*> &polygons, int start, int end, int depth
 }
 
 BVHNode* constructBVHTree(std::vector<Polygon*> &polygons) {
-    return buildBVH(polygons, 0, polygons.size());
+    return buildBVH(polygons, 0, polygons.size(), polygons.size()/500);
 }
 
 void freeBVHTree(BVHNode* node) {

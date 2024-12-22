@@ -181,9 +181,8 @@ void scanLine(float* z_buffer, vector<Polygon*>& APT, vector<ActiveEdge>& AET)
     for (int y = IMG_HEIGHT - 1; y >= 0; y--)
     {
         // if new polygon is in the scan line, add it to active polygon list(APT)
-        for (int i = 0; i < (int)PT[y].size(); i++)
+        for (int i = 0; i < PT[y].size(); i++)
         {
-            assert(i >= 0);
             Polygon *polygon = PT[y][i];
             // add edges intersected with the scan line into active edge list(AET)
             ActiveEdge ae;

@@ -104,51 +104,6 @@ bool HierarchicalZBuffer::IsVisible(Polygon& polygon)
     return true; // If it's not occluded
 }
 
-void HierarchicalZBuffer::IsVisible(BVHNode* node, vector<Polygon*>& polygons) 
-{
-    BoundingBox bbox = node->bbox;
-    
-    // Get the bounding box and depth range of the polygon
-    int min_x = bbox.minX;
-    int max_x = bbox.maxX;
-    int min_y = bbox.minY;
-    int max_y = bbox.maxY;
-
-    float min_depth = bbox.maxZ;
-
-    // Traverse the Z pyramid from coarse (higher levels) to fine (lower levels)
-    for (int level = GetNumLevels() - 3; level >= 1; --level) 
-    {
-        int pyramid_width = width >> level;
-
-        int start_x = min_x >> level;
-        int start_y = min_y >> level;
-        int end_x = max_x >> level;
-        int end_y = max_y >> level;
-
-        // Check the Z buffer at the current pyramid level
-        if(start_x == end_x && start_y == end_y && min_depth < z_pyramid[level][start_y * pyramid_width + start_x])
-        {
-            return;
-        }
-        else if(start_x != end_x || start_y != end_y)
-        {
-            // stop when reaching the smallest level containing the polygon
-            break;
-        }
-    }
-
-    if(!node->isLeaf())
-    {
-        IsVisible(node->left, polygons);
-        IsVisible(node->right, polygons);
-    }
-    else 
-    {
-        
-    }
-}
-
 // Gets the depth value from the lowest level (highest resolution) of the Z pyramid
 float HierarchicalZBuffer::GetDepth(int x, int y) 
 {

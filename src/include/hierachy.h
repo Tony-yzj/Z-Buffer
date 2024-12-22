@@ -18,7 +18,7 @@ public:
 
     // Uses the Z pyramid to perform occlusion culling (rough-level check)
     bool IsVisible(Polygon& polygon);
-    void IsVisible(BVHNode* node, vector<Polygon*>& polygons); 
+    void IsVisible(BVHNode* node); 
 
     // Gets the depth value from the lowest level (highest resolution) of the Z pyramid
     float GetDepth(int x, int y);

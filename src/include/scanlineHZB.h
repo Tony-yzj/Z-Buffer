@@ -24,6 +24,6 @@ void ListContruct(vector<Triangle> * faces);
 
 void addActiveEdge(ActiveEdge& AE , Edge edge1, Edge edge2, Polygon* polygon, int y);
 
-void scanLine( HierarchicalZBuffer* hzb, vector<ActiveEdge>& AET);
-void scanLine( HierarchicalZBuffer* hzb, BVHNode* bvh, vector<ActiveEdge>& AET);
+void scanLine( HierarchicalZBuffer* hzb);
+void scanLine( HierarchicalZBuffer* hzb, BVHNode* bvh);
 #endif

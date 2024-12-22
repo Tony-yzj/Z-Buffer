@@ -296,7 +296,57 @@ void renderPolygon(Polygon* polygon, HierarchicalZBuffer* hzb)
         ynow--;
     }
 }
-void scanLine( HierarchicalZBuffer* hzb, vector<ActiveEdge>& AET)
+
+int cull = 0;
+void HierarchicalZBuffer::IsVisible(BVHNode* node) 
+{
+    BoundingBox bbox = node->bbox;
+    
+    // Get the bounding box and depth range of the polygon
+    int min_x = bbox.minX;
+    int max_x = bbox.maxX;
+    int min_y = bbox.minY;
+    int max_y = bbox.maxY;
+
+    float min_depth = bbox.maxZ;
+
+    // Traverse the Z pyramid from coarse (higher levels) to fine (lower levels)
+    for (int level = GetNumLevels() - 3; level >= 1; --level) 
+    {
+        int pyramid_width = width >> level;
+
+        int start_x = min_x >> level;
+        int start_y = min_y >> level;
+        int end_x = max_x >> level;
+        int end_y = max_y >> level;
+
+        // Check the Z buffer at the current pyramid level
+        if(start_x == end_x && start_y == end_y && min_depth < z_pyramid[level][start_y * pyramid_width + start_x])
+        {
+            cull += node->polygons.size();
+            return;
+        }
+        else if(start_x != end_x || start_y != end_y)
+        {
+            // stop when reaching the smallest level containing the polygon
+            break;
+        }
+    }
+
+    if(!node->isLeaf())
+    {
+        IsVisible(node->left);
+        IsVisible(node->right);
+    }
+    else 
+    {
+        for(auto polygon : node->polygons)
+        {
+            renderPolygon(polygon, this);
+        }
+    }
+}
+void scanLine( HierarchicalZBuffer* hzb)
 {
     int cull_cnt = 0;
 
@@ -321,148 +371,15 @@ void scanLine( HierarchicalZBuffer* hzb, vector<ActiveEdge>& AET)
     // Clear PT & ET
     ClearTable();
 }
-void scanLine( HierarchicalZBuffer* hzb, BVHNode* bvh, vector<ActiveEdge>& AET)
+void scanLine( HierarchicalZBuffer* hzb, BVHNode* bvh)
 {
-    // AET.clear();
 
-    // fill(image.begin<Vec3b>(), image.end<Vec3b>(), Vec3b(244, 234, 226));
+    fill(image.begin<Vec3b>(), image.end<Vec3b>(), Vec3b(244, 234, 226));
 
-    // bvh = constructBVHTree(PT);
+    hzb->IsVisible(bvh);
 
-    // vector<Polygon*> APT;
-    // hzb->IsVisible(bvh, APT);
-
-    // cout << "cull_cnt: " << PT.size() - APT.size() << endl;
-
-    // // if new polygon is in the scan line, add edge to AET
-    // for (int i = 0; i < (int)APT.size(); i++)
-    // {
-    //     assert(i >= 0);
-    //     Polygon *polygon = APT[i];
-
-    //     // add edges intersected with the scan line into active edge list(AET)
-    //     int ynow = polygon->bbox.maxY;
-    //     Edge edge1, edge2;
-
-    //     // find edge in current polygon with max y
-    //     for (int j = 0; j < ET[ynow].size(); j++)
-    //     {
-    //         if (ET[ynow][j].id == APT[i])
-    //         {
-    //             edge1 = ET[ynow][j];
-    //             edge2 = ET[ynow][j + 1];
-    //             break;
-    //         }
-    //     }
-
-    //     addActiveEdge(AET, edge1, edge2, polygon, ynow);
-
-    //     while(polygon->dy >= 0 && ynow > 0)
-    //     {   
-    //         int size = AET.size();
-    //         for (int i = 0; i < size; i++)
-    //         {
-    //             ActiveEdge& ae = AET[i];
-    //             float zx = ae.zl;
-    //             int left = (int)floor(ae.xl), right = (int)floor(ae.xr);
-
-    //             if(left < 0)
-    //             {
-    //                 left = 0;
-    //                 zx += ae.dzx * (0 - ae.xl);
-    //             }    
-    //             else if(left > IMG_WIDTH - 1)
-    //                 left = IMG_WIDTH - 1;
-
-    //             if(right < 0)
-    //                 right = 0;
-    //             else if(right > IMG_WIDTH - 1)
-    //                 right = IMG_WIDTH - 1;
-
-    //             for(int j = left; j <= right; j++)
-    //             {
-    //                 if (zx > hzb->at(j, ynow, 0))
-    //                 {
-    //                     image.at<Vec3b>((IMG_HEIGHT - 1 - ynow), j) = ae.id->color;
-    //                     hzb->Update(j, ynow, zx);
-    //                 }
-    //                 zx += ae.dzx;
-    //             }
-
-    //             // update AET
-    //             AET[i].xl += ae.dxl;
-    //             AET[i].xr += ae.dxr;
-    //             AET[i].zl += ae.dzx * ae.dxl + ae.dzy;
-    //             AET[i].dyl -= 1;
-    //             AET[i].dyr -= 1;
-
-    //             if (AET[i].dyl < 0 && AET[i].dyr < 0)
-    //             {
-    //                 if(ynow<=0)
-    //                 {
-    //                     break;
-    //                 }
-                    
-    //                 Edge edge1, edge2;
-    //                 int j = 0;
-    //                 for(j = 0; j < ET[ynow-1].size(); j++)
-    //                 {
-    //                     if(AET[i].id == ET[ynow-1][j].id)
-    //                     {
-    //                         edge1 = ET[ynow-1][j];
-    //                         edge2 = ET[ynow-1][j+1];
-    //                         break;
-    //                     }
-    //                 }
-    //                 if(j < ET[ynow-1].size())
-    //                     addActiveEdge(AET, edge1, edge2, AET[i].id, ynow);
-    //                 AET.erase(AET.begin() + i);
-    //                 i--;
-    //                 size--;
-    //             }
-    //             else if (AET[i].dyl < 0)
-    //             {
-    //                 if(ynow<=0)
-    //                 {
-    //                     break;
-    //                 }
-    //                 for (int j = 0; j < ET[ynow-1].size(); j++)
-    //                 {
-    //                     if (AET[i].id == ET[ynow-1][j].id)
-    //                     {
-    //                         Edge edge = ET[ynow-1][j];
-    //                         AET[i].xl = edge.x;
-    //                         AET[i].dxl = edge.dx;
-    //                         AET[i].dyl = edge.dy;
-    //                         break;
-    //                     }
-    //                 }
-    //             }
-    //             else if (AET[i].dyr < 0)
-    //             {
-    //                 if(ynow<=0)
-    //                 {
-    //                     break;
-    //                 }
-    //                 for (int j = 0; j < ET[ynow-1].size(); j++)
-    //                 {
-    //                     if (AET[i].id == ET[ynow-1][j].id)
-    //                     {
-    //                         Edge edge = ET[ynow-1][j];
-    //                         AET[i].xr = edge.x;
-    //                         AET[i].dxr = edge.dx;
-    //                         AET[i].dyr = edge.dy;
-    //                         break;
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         polygon->dy--;
-    //         ynow--;
-    //     }
-    //     AET.clear();
-    // }
-    // // Clear PT & ET
-    // ClearTable();
-    // freeBVHTree(bvh);
+    cout << "cull_cnt: " << cull << endl;
+    // Clear PT & ET
+    ClearTable();
+    freeBVHTree(bvh);
 }

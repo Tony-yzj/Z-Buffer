@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cfloat>
 #include <cmath>
+#include <cstring>
 #include <ctime>
 #include <iostream>
 #include <opencv2/core/cvdef.h>

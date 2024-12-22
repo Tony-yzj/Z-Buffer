@@ -28,8 +28,6 @@ using namespace objl;
 struct MouseParams {
     vector<Triangle> *faces;
     HierarchicalZBuffer* hvb;
-    vector<ActiveEdge> * AET;
-    BVHNode* bvh;
 };
 
 std::vector<Polygon*> PT;
@@ -78,7 +76,8 @@ void mouseCallback(int event, int x, int y, int flags, void* userdata) {
         // Redo ScanLine algorithm
         clock_t start = clock();    
         ListContruct(params->faces);
-        scanLine(params->hvb, *(params->AET));
+        BVHNode* bvh = constructBVHTree(PT);
+        scanLine(params->hvb, bvh);
 
         cout << "Mouse moved to (" << x << ", " << y << ")" << endl;
         clock_t end = clock();
@@ -131,13 +130,10 @@ int main(int argc, char** argv)
     ET.resize(image.rows);
 
     // scan line z buffer algorithm
-    vector<ActiveEdge> AET;
 
     MouseParams params;
-    params.AET = &AET;
     params.faces = &faces;
     params.hvb = hzb;
-    params.bvh = bvh;
 
     cv::namedWindow("Zbuffer");
     cv::setMouseCallback("Zbuffer", mouseCallback, &params);
@@ -150,8 +146,13 @@ int main(int argc, char** argv)
     clock_t construct_s = clock();
     ListContruct(&faces);
     cout << "Construct Time: " << (double)(clock() - construct_s) / CLOCKS_PER_SEC << "s" << endl;
+
+    clock_t bvh_s = clock();
+    bvh = constructBVHTree(PT);
+    cout << "BVH Time: " << (double)(clock() - bvh_s) / CLOCKS_PER_SEC << "s" << endl;
+
     clock_t scan_s = clock();
-    scanLine(hzb, bvh, AET);
+    scanLine(hzb, bvh);
     cout << "Scan Time: " << (double)(clock() - scan_s) / CLOCKS_PER_SEC << "s" << endl;
 
     
