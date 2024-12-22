@@ -1,4 +1,5 @@
 #pragma once
+#include "BVH.h"
 #ifndef HIERARCHICAL_ZBUFFER_H
 #define HIERARCHICAL_ZBUFFER_H
 
@@ -17,6 +18,7 @@ public:
 
     // Uses the Z pyramid to perform occlusion culling (rough-level check)
     bool IsVisible(Polygon& polygon);
+    void IsVisible(BVHNode* node, vector<Polygon*>& polygons); 
 
     // Gets the depth value from the lowest level (highest resolution) of the Z pyramid
     float GetDepth(int x, int y);

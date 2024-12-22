@@ -12,7 +12,7 @@
 #include "Features.h"
 #include "hierachy.h"
 #include "readObj.h"
-#include "scanline.h"
+#include "scanlineHZB.h"
 #define HIERACHY 1
 
 using namespace std;
@@ -22,11 +22,10 @@ using namespace objl;
 struct MouseParams {
     vector<Triangle> *faces;
     HierarchicalZBuffer* hvb;
-    vector<Polygon*> *APT;
     vector<ActiveEdge> * AET;
 };
 
-std::vector<std::vector<Polygon*>> PT;
+std::vector<Polygon*> PT;
 std::vector<std::vector<Edge>> ET;
 // initial image
 Mat image(IMG_HEIGHT, IMG_WIDTH, CV_8UC3, Vec3b(244, 234, 226));
@@ -72,7 +71,7 @@ void mouseCallback(int event, int x, int y, int flags, void* userdata) {
         // Redo ScanLine algorithm
         clock_t start = clock();    
         ListContruct(params->faces);
-        scanLine(params->hvb, *(params->APT), *(params->AET));
+        scanLine(params->hvb, *(params->AET));
 
         cout << "Mouse moved to (" << x << ", " << y << ")" << endl;
         clock_t end = clock();
@@ -120,7 +119,7 @@ int main(int argc, char** argv)
     HierarchicalZBuffer* hzb = new HierarchicalZBuffer(IMG_WIDTH, IMG_HEIGHT);
 
     // contruct polygon and edge list
-    PT.resize(image.rows);
+    // PT.resize(image.rows);
     ET.resize(image.rows);
 
     // scan line z buffer algorithm
@@ -129,7 +128,6 @@ int main(int argc, char** argv)
 
     MouseParams params;
     params.AET = &AET;
-    params.APT = &APT;
     params.faces = &faces;
     params.hvb = hzb;
 
@@ -145,7 +143,7 @@ int main(int argc, char** argv)
     ListContruct(&faces);
     cout << "Construct Time: " << (double)(clock() - construct_s) / CLOCKS_PER_SEC << "s" << endl;
     clock_t scan_s = clock();
-    scanLine(hzb, APT, AET);
+    scanLine(hzb, AET);
     cout << "Scan Time: " << (double)(clock() - scan_s) / CLOCKS_PER_SEC << "s" << endl;
 
     

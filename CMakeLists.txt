@@ -2,6 +2,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(zbuffer)
 project(hierachyZbuffer)
+project(hierachyZbufferBVH)
 
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 17)
@@ -31,13 +32,15 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 
 # 查找 src 文件夹下的所有 .cpp 文件
 file(GLOB SRC_FILES ${PROJECT_SOURCE_DIR}/src/scanlineZbuffer.cpp ${PROJECT_SOURCE_DIR}/src/model.cpp ${PROJECT_SOURCE_DIR}/src/scanline.cpp ${PROJECT_SOURCE_DIR}/src/hierachy.cpp  ${PROJECT_SOURCE_DIR}/src/include/*.h)
-file(GLOB H_FILES ${PROJECT_SOURCE_DIR}/src/hierachyZbuffer.cpp  ${PROJECT_SOURCE_DIR}/src/model.cpp ${PROJECT_SOURCE_DIR}/src/scanline.cpp ${PROJECT_SOURCE_DIR}/src/hierachy.cpp ${PROJECT_SOURCE_DIR}/src/include/*.h)
-
+file(GLOB H_FILES ${PROJECT_SOURCE_DIR}/src/hierachyZbuffer.cpp  ${PROJECT_SOURCE_DIR}/src/model.cpp ${PROJECT_SOURCE_DIR}/src/scanlineHZB.cpp ${PROJECT_SOURCE_DIR}/src/BVH.cpp ${PROJECT_SOURCE_DIR}/src/hierachy.cpp ${PROJECT_SOURCE_DIR}/src/include/*.h)
+file(GLOB BVH_FILES ${PROJECT_SOURCE_DIR}/src/hierachyZbufferBVH.cpp  ${PROJECT_SOURCE_DIR}/src/model.cpp ${PROJECT_SOURCE_DIR}/src/scanlineHZB.cpp ${PROJECT_SOURCE_DIR}/src/hierachy.cpp ${PROJECT_SOURCE_DIR}/src/BVH.cpp ${PROJECT_SOURCE_DIR}/src/include/*.h)
 
 # 定义可执行文件
 add_executable(zbuffer ${SRC_FILES})
 add_executable(hierachyZbuffer ${H_FILES})
+add_executable(hierachyZbufferBVH ${BVH_FILES})
 
 # 链接 OpenCV 库
 target_link_libraries(zbuffer ${OpenCV_LIBS})
 target_link_libraries(hierachyZbuffer ${OpenCV_LIBS})
+target_link_libraries(hierachyZbufferBVH ${OpenCV_LIBS})
